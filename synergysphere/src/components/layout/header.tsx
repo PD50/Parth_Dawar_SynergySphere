@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Moon, Sun, LogOut, Settings, User } from "lucide-react";
 import Link from "next/link";
 import { MobileSidebar } from "./mobile-sidebar";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 export function Header() {
   const { theme, setTheme } = useTheme();
@@ -45,6 +46,8 @@ export function Header() {
 
         <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
           <nav className="flex items-center space-x-2">
+            {isAuthenticated && <NotificationBell />}
+            
             <Button
               variant="ghost"
               size="icon"
