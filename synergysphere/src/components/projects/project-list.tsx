@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ProjectForm } from "./project-form";
 import { 
   MoreHorizontal, 
@@ -14,7 +14,6 @@ import {
   Trash2, 
   Users, 
   Calendar,
-  Plus,
   FolderOpen,
   Archive
 } from "lucide-react";
@@ -48,7 +47,6 @@ const statusConfig = {
 
 export function ProjectList({ projects, onProjectUpdate }: ProjectListProps) {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   const handleDelete = async (project: Project) => {
     if (!confirm(`Are you sure you want to delete "${project.name}"?`)) {
@@ -105,42 +103,12 @@ export function ProjectList({ projects, onProjectUpdate }: ProjectListProps) {
         icon={<FolderOpen className="h-12 w-12" />}
         title="No projects yet"
         description="Create your first project to get started with team collaboration"
-        action={{
-          label: "Create Project",
-          onClick: () => setIsCreateDialogOpen(true),
-        }}
       />
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold">Projects</h2>
-          <p className="text-muted-foreground">
-            Manage your team projects and collaborate effectively
-          </p>
-        </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Project
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <ProjectForm
-              onSuccess={() => {
-                setIsCreateDialogOpen(false);
-                onProjectUpdate?.();
-              }}
-              onCancel={() => setIsCreateDialogOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map((project) => (
           <Card key={project.id} className="hover:shadow-lg transition-shadow">
