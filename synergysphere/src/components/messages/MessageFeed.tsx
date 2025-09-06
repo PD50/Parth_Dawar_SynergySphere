@@ -83,9 +83,11 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
   }, [getTypingUsers, projectId, currentUserId]);
 
   // Load messages for the project
-  const loadMessages = async () => {
+  const loadMessages = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       const response = await fetch(`/api/projects/${projectId}/messages?limit=50`);
       
       if (!response.ok) {
@@ -93,12 +95,19 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
       }
       
       const data = await response.json();
-      setMessages(data.messages || []);
+      const newMessages = data.messages || [];
+      
+      // Always update messages to ensure real-time updates work
+      setMessages(newMessages);
     } catch (error) {
       console.error('Failed to load messages:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load messages');
+      if (!silent) {
+        setError(error instanceof Error ? error.message : 'Failed to load messages');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -108,6 +117,20 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
       loadMessages();
     }
   }, [projectId]);
+
+  // Auto-polling for real-time message updates
+  useEffect(() => {
+    if (!projectId) return;
+
+    const pollInterval = setInterval(() => {
+      // Only poll if user is not currently typing to avoid interrupting
+      if (!isComposerFocused) {
+        loadMessages(true); // Silent polling to avoid loading states
+      }
+    }, 500); // Poll every 0.5 seconds for near-instant updates
+
+    return () => clearInterval(pollInterval);
+  }, [projectId, isComposerFocused]);
 
   // Handle scroll to detect when user is at bottom
   const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {

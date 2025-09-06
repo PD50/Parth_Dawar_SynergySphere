@@ -129,25 +129,12 @@ async function createMessage(projectId: string, messageData: {
   attachments?: any[];
 }, authorId: string) {
   // Extract mentions from content - handle names with spaces
-  console.log('Processing mentions in content:', messageData.content);
-  console.log('Content length:', messageData.content.length);
-  
-  // Match @mention until we hit space+lowercase word (indicating end of name)
   const mentionRegex = /@([\w\s]+?)(?=\s[a-z]|$)/g;
-  console.log('Using regex:', mentionRegex.source);
-  
   const contentMentions: string[] = [];
   let match;
   
   while ((match = mentionRegex.exec(messageData.content)) !== null) {
-    console.log('Raw match:', match);
-    console.log('Match[0] (full match):', match[0]);
-    console.log('Match[1] (captured group):', match[1]);
-    console.log('Match[1] length:', match[1].length);
-    
     const mentionedName = match[1].trim();
-    console.log('Trimmed mention name:', mentionedName);
-    console.log('Trimmed name length:', mentionedName.length);
     
     // Look up users by exact name match
     const mentionedUsers = await prisma.user.findMany({
@@ -156,19 +143,16 @@ async function createMessage(projectId: string, messageData: {
       },
       select: { id: true, name: true },
     });
-    console.log('Matched users for', mentionedName, ':', mentionedUsers);
     
     mentionedUsers.forEach(user => {
       if (!contentMentions.includes(user.id)) {
         contentMentions.push(user.id);
-        console.log('Added user ID to contentMentions:', user.id);
       }
     });
   }
 
   const mentions = [...(messageData.mentions || []), ...contentMentions];
   const uniqueMentions = [...new Set(mentions)];
-  console.log('Final mentions array:', uniqueMentions);
 
   // Set threadId - if this is a reply, use the parentId's threadId or the parentId itself
   let finalThreadId = messageData.threadId;
@@ -218,16 +202,9 @@ async function createMessage(projectId: string, messageData: {
   });
 
   // Create notifications for mentioned users
-  console.log('Creating notifications for mentions. Unique mentions:', uniqueMentions);
-  console.log('Author ID:', authorId);
-  
   if (uniqueMentions.length > 0) {
     const mentionNotifications = uniqueMentions
-      .filter(userId => {
-        const shouldNotify = userId !== authorId;
-        console.log(`User ${userId} - should notify:`, shouldNotify);
-        return shouldNotify;
-      })
+      .filter(userId => userId !== authorId) // Don't notify yourself
       .map(userId => ({
         userId,
         fromUserId: authorId,
@@ -242,19 +219,12 @@ async function createMessage(projectId: string, messageData: {
           url: `/dashboard/projects/${projectId}/messages?thread=${finalThreadId}`,
         },
       }));
-
-    console.log('Mention notifications to create:', mentionNotifications);
     
     if (mentionNotifications.length > 0) {
-      const result = await prisma.notification.createMany({
+      await prisma.notification.createMany({
         data: mentionNotifications,
       });
-      console.log('Created notifications result:', result);
-    } else {
-      console.log('No notifications to create');
     }
-  } else {
-    console.log('No unique mentions found');
   }
 
   // Create reply notification if this is a reply

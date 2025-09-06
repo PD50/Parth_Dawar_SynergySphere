@@ -42,10 +42,12 @@ export function NotificationBell({
 
   // Fetch notifications on mount and periodically
   useEffect(() => {
-    const fetchNotifications = async () => {
+    const fetchNotifications = async (silent = false) => {
       try {
-        setLoading(true);
-        setError(null);
+        if (!silent) {
+          setLoading(true);
+          setError(null);
+        }
 
         const response = await fetch('/api/notifications?limit=20');
         
@@ -54,22 +56,30 @@ export function NotificationBell({
         }
         
         const data = await response.json();
-        setNotifications(data.notifications || []);
-        setUnreadCount(data.unreadCount || 0);
+        const newNotifications = data.notifications || [];
+        const newUnreadCount = data.unreadCount || 0;
+        
+        // Always update to ensure real-time notifications work
+        setNotifications(newNotifications);
+        setUnreadCount(newUnreadCount);
       } catch (err) {
-        setError('Failed to fetch notifications');
-        console.error('Failed to fetch notifications:', err);
+        if (!silent) {
+          setError('Failed to fetch notifications');
+          console.error('Failed to fetch notifications:', err);
+        }
       } finally {
-        setLoading(false);
+        if (!silent) {
+          setLoading(false);
+        }
       }
     };
 
     fetchNotifications();
 
-    // Poll for new notifications every 30 seconds
-    const interval = setInterval(fetchNotifications, 30000);
+    // Poll for new notifications every 0.5 seconds for instant updates
+    const interval = setInterval(() => fetchNotifications(true), 500);
     return () => clearInterval(interval);
-  }, [setLoading, setError, setNotifications, setUnreadCount]);
+  }, [setLoading, setError, setNotifications, setUnreadCount, notifications, unreadCount]);
 
   // Detect new notifications
   useEffect(() => {
