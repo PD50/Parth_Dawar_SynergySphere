@@ -5,50 +5,27 @@ import { useAuth } from "@/hooks/useAuth";
 import { TeamMemberList } from "@/components/team/team-member-list";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
-// Mock data for demonstration
-const mockTeamMembers = [
-  {
-    id: "1",
-    name: "Alice Johnson",
-    email: "alice@synergysphere.com",
-    avatarUrl: "",
-    role: "OWNER" as const,
-    joinedAt: "2024-01-01T00:00:00Z",
-    lastActive: "2024-01-20T15:30:00Z",
-  },
-  {
-    id: "2",
-    name: "Bob Smith",
-    email: "bob@synergysphere.com",
-    avatarUrl: "",
-    role: "ADMIN" as const,
-    joinedAt: "2024-01-05T00:00:00Z",
-    lastActive: "2024-01-20T14:20:00Z",
-  },
-  {
-    id: "3",
-    name: "Carol Davis",
-    email: "carol@synergysphere.com",
-    avatarUrl: "",
-    role: "MEMBER" as const,
-    joinedAt: "2024-01-10T00:00:00Z",
-    lastActive: "2024-01-20T13:45:00Z",
-  },
-  {
-    id: "4",
-    name: "David Wilson",
-    email: "david@synergysphere.com",
-    avatarUrl: "",
-    role: "MEMBER" as const,
-    joinedAt: "2024-01-15T00:00:00Z",
-    lastActive: "2024-01-20T16:00:00Z",
-  },
-];
+interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  role: string;
+  joinedAt: string;
+  lastActive: string;
+  projectCount: number;
+  projects: Array<{
+    id: string;
+    name: string;
+    role: string;
+  }>;
+}
 
 export default function TeamPage() {
   const { user } = useAuth();
-  const [members, setMembers] = useState<any[]>([]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,14 +34,16 @@ export default function TeamPage() {
       setIsLoading(true);
       setError(null);
 
-      // Simulate API call - in real app this would be:
-      // const response = await fetch("/api/team/members");
-      // const result = await response.json();
+      const response = await fetch("/api/team/members");
       
-      // For now, use mock data
-      await new Promise(resolve => setTimeout(resolve, 800)); // Simulate loading
-      setMembers(mockTeamMembers);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch team members: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      setMembers(result.members || []);
     } catch (err) {
+      console.error('Failed to fetch team members:', err);
       const errorMessage = err instanceof Error ? err.message : "Failed to fetch team members";
       setError(errorMessage);
     } finally {
@@ -92,6 +71,11 @@ export default function TeamPage() {
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
+        <div className="flex justify-center">
+          <Button onClick={fetchTeamMembers} variant="outline">
+            Try Again
+          </Button>
+        </div>
       </div>
     );
   }

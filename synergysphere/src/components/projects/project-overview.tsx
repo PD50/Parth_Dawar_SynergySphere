@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
+import { ProjectMemberManager } from "@/components/projects/project-member-manager";
 import Link from "next/link";
 import { 
   Calendar, 
@@ -56,6 +57,7 @@ interface ProjectOverviewProps {
   members: TeamMember[];
   recentActivity: RecentActivity[];
   onEdit?: () => void;
+  currentUserRole?: string;
 }
 
 const statusConfig = {
@@ -68,12 +70,15 @@ export function ProjectOverview({
   project,
   members,
   recentActivity,
-  onEdit
+  onEdit,
+  currentUserRole
 }: ProjectOverviewProps) {
   const completionRate = Math.round((project.completedTasks / project.totalTasks) * 100) || 0;
   const daysUntilDeadline = project.deadline 
     ? Math.ceil((new Date(project.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
     : null;
+  
+  const canManageMembers = currentUserRole === 'OWNER' || currentUserRole === 'ADMIN';
 
   return (
     <div className="space-y-6">
@@ -255,6 +260,12 @@ export function ProjectOverview({
             </div>
           </CardContent>
         </Card>
+
+        {/* Project Member Management */}
+        <ProjectMemberManager 
+          projectId={project.id} 
+          canManage={canManageMembers}
+        />
 
         {/* Recent Activity */}
         <Card>

@@ -31,9 +31,15 @@ interface TeamMember {
   name: string;
   email: string;
   avatarUrl?: string;
-  role: MemberRole;
+  role: string;
   joinedAt: string;
   lastActive: string;
+  projectCount: number;
+  projects: Array<{
+    id: string;
+    name: string;
+    role: string;
+  }>;
 }
 
 interface TeamMemberListProps {
@@ -70,6 +76,7 @@ export function TeamMemberList({
 }: TeamMemberListProps) {
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
   const [inviteRole, setInviteRole] = useState<MemberRole>("MEMBER");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -77,36 +84,51 @@ export function TeamMemberList({
   const canManageMembers = currentUser?.role === "OWNER" || currentUser?.role === "ADMIN";
 
   const handleInviteMember = async () => {
-    if (!inviteEmail.trim()) {
-      toast.error("Email address is required");
+    if (!inviteEmail.trim() || !inviteName.trim()) {
+      toast.error("Email and name are required");
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await fetch("/api/team/invite", {
+      const response = await fetch("/api/team/members", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           email: inviteEmail,
+          name: inviteName,
           role: inviteRole,
         }),
       });
 
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.error || "Failed to send invitation");
+        throw new Error(result.error || "Failed to add team member");
       }
 
-      toast.success("Invitation sent successfully");
+      const result = await response.json();
+      
+      // Show success message with credentials if provided
+      if (result.tempCredentials) {
+        toast.success(
+          `✅ ${result.message}\n🔑 Email: ${result.tempCredentials.email}\n🔐 Password: ${result.tempCredentials.tempPassword}\n🌐 Login at: ${result.tempCredentials.loginUrl}`,
+          { duration: 10000 }
+        );
+      } else if (result.tempPassword) {
+        toast.success(`Team member added! Temp password: ${result.tempPassword}`);
+      } else {
+        toast.success(result.message || "Team member added successfully");
+      }
+      
       setInviteEmail("");
+      setInviteName("");
       setInviteRole("MEMBER");
       setIsInviteDialogOpen(false);
       onMemberUpdate?.();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to send invitation";
+      const errorMessage = error instanceof Error ? error.message : "Failed to add team member";
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
@@ -164,9 +186,9 @@ export function TeamMemberList({
       <EmptyState
         icon={<Users className="h-12 w-12" />}
         title="No team members yet"
-        description="Invite team members to start collaborating on projects"
+        description="Add team members to start collaborating on projects. They'll be able to access projects you assign them to."
         action={canManageMembers ? {
-          label: "Invite Member",
+          label: "Add Member",
           onClick: () => setIsInviteDialogOpen(true),
         } : undefined}
       />
@@ -188,14 +210,24 @@ export function TeamMemberList({
             <DialogTrigger asChild>
               <Button>
                 <UserPlus className="mr-2 h-4 w-4" />
-                Invite Member
+                Add Member
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Invite Team Member</DialogTitle>
+                <DialogTitle>Add Team Member</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="John Smith"
+                    value={inviteName}
+                    onChange={(e) => setInviteName(e.target.value)}
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address</Label>
                   <Input
@@ -223,8 +255,8 @@ export function TeamMemberList({
                     Cancel
                   </Button>
                   <Button onClick={handleInviteMember} disabled={isLoading}>
-                    <Mail className="mr-2 h-4 w-4" />
-                    Send Invitation
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Add Member
                   </Button>
                 </div>
               </div>
@@ -235,7 +267,9 @@ export function TeamMemberList({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {members.map((member) => {
-          const RoleIcon = roleConfig[member.role].icon;
+          const memberRole = member.role as keyof typeof roleConfig || 'MEMBER';
+          const roleInfo = roleConfig[memberRole] || roleConfig.MEMBER;
+          const RoleIcon = roleInfo.icon;
           const canModify = canManageMembers && member.id !== currentUserId && member.role !== "OWNER";
           
           return (
@@ -285,20 +319,45 @@ export function TeamMemberList({
               </CardHeader>
               
               <CardContent>
-                <div className="space-y-2">
-                  <Badge 
-                    variant="secondary" 
-                    className={roleConfig[member.role].className}
-                  >
-                    <RoleIcon className="mr-1 h-3 w-3" />
-                    {roleConfig[member.role].label}
-                  </Badge>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Badge 
+                      variant="secondary" 
+                      className={roleInfo.className}
+                    >
+                      <RoleIcon className="mr-1 h-3 w-3" />
+                      {roleInfo.label}
+                    </Badge>
+                    {member.projectCount > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        {member.projectCount} project{member.projectCount !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    {roleConfig[member.role].description}
+                    {roleInfo.description}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Joined {new Date(member.joinedAt).toLocaleDateString()}
                   </p>
+                  {member.projects && member.projects.length > 0 && (
+                    <div className="pt-2 border-t">
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Projects:</p>
+                      <div className="space-y-1">
+                        {member.projects.slice(0, 2).map((project) => (
+                          <div key={project.id} className="flex justify-between text-xs">
+                            <span className="truncate">{project.name}</span>
+                            <span className="text-muted-foreground ml-2">{project.role.toLowerCase()}</span>
+                          </div>
+                        ))}
+                        {member.projects.length > 2 && (
+                          <p className="text-xs text-muted-foreground">
+                            +{member.projects.length - 2} more...
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
