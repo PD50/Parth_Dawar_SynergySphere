@@ -1,0 +1,69 @@
+{
+  "name": "standup-bot",
+  "version": "1.0.0",
+  "description": "Production-ready stand-up bot service",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "integration-test": "node integration-test.js",
+    "setup": "cp .env.example .env && npm run prisma:migrate && npm run prisma:seed",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "db:reset": "rimraf *.db && prisma migrate reset --force --skip-generate && prisma db seed",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src",
+    "postinstall": "prisma generate"
+  },
+  "keywords": [
+    "standup",
+    "bot",
+    "project-management",
+    "slack"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.17.0",
+    "@fastify/cors": "^11.1.0",
+    "@prisma/client": "^5.22.0",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.3.1",
+    "fastify": "^4.25.2",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^3.3.2",
+    "openai": "^4.24.1",
+    "pino": "^8.17.2",
+    "pino-pretty": "^10.3.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^8.56.0",
+    "@types/babel__core": "^7.20.5",
+    "@types/babel__generator": "^7.27.0",
+    "@types/babel__template": "^7.4.4",
+    "@types/babel__traverse": "^7.28.0",
+    "@types/node": "^20.19.13",
+    "@types/node-cron": "^3.0.11",
+    "@types/prop-types": "^15.7.15",
+    "eslint": "^8.56.0",
+    "prettier": "^3.1.1",
+    "prisma": "^5.22.0",
+    "rimraf": "^6.0.1",
+    "supertest": "^6.3.3",
+    "tsx": "^4.20.5",
+    "typescript": "^5.3.3",
+    "vitest": "^1.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}

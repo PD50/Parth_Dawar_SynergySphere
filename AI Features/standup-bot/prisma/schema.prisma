@@ -1,0 +1,131 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id                 String   @id @default(cuid())
+  name               String
+  thread_channel     String?
+  timezone           String   @default("Asia/Kolkata")
+  business_days_only Boolean  @default(true)
+  slack_mode         String   @default("webhook")
+  slack_webhook_url  String?
+  slack_bot_token    String?
+  slack_channel_id   String?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  tasks         Task[]
+  taskActivity  TaskActivity[]
+  standupPosts  StandupPost[]
+  components    Component[]
+}
+
+model User {
+  id             String   @id @default(cuid())
+  name           String
+  email          String   @unique
+  active         Boolean  @default(true)
+  capacity_score Float    @default(0.8)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  tasks         Task[]
+  activities    TaskActivity[]
+  ownedComponents Component[]
+}
+
+model Task {
+  id              String   @id
+  project_id      String
+  title           String
+  status          String
+  status_category String
+  priority        Int      @default(1)
+  assignee_id     String?
+  due_at          DateTime?
+  updated_at      DateTime @default(now())
+  created_at      DateTime @default(now())
+
+  project  Project @relation(fields: [project_id], references: [id])
+  assignee User?   @relation(fields: [assignee_id], references: [id])
+
+  activity       TaskActivity[]
+  taskComponents TaskComponent[]
+
+  @@index([project_id, status_category, due_at])
+}
+
+model TaskActivity {
+  id          String   @id @default(cuid())
+  project_id  String
+  task_id     String
+  from_status String?
+  to_status   String
+  at          DateTime @default(now())
+  actor_id    String?
+  note        String?
+
+  project Project @relation(fields: [project_id], references: [id])
+  task    Task    @relation(fields: [task_id], references: [id])
+  actor   User?   @relation(fields: [actor_id], references: [id])
+
+  @@index([project_id, at])
+}
+
+model StandupPost {
+  id           String   @id @default(cuid())
+  project_id   String
+  window_hours Int
+  window_start DateTime
+  window_end   DateTime
+  payload_hash String
+  body         String
+  posted_at    DateTime @default(now())
+
+  project Project @relation(fields: [project_id], references: [id])
+
+  @@index([project_id, posted_at])
+}
+
+model Component {
+  id               String   @id @default(cuid())
+  project_id       String
+  name             String
+  description      String?
+  default_owner_id String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  project       Project         @relation(fields: [project_id], references: [id])
+  default_owner User?           @relation(fields: [default_owner_id], references: [id])
+  taskComponents TaskComponent[]
+
+  @@index([project_id])
+}
+
+model TaskComponent {
+  id           String @id @default(cuid())
+  task_id      String
+  component_id String
+
+  task      Task      @relation(fields: [task_id], references: [id])
+  component Component @relation(fields: [component_id], references: [id])
+
+  @@unique([task_id, component_id])
+}
+
+// SQLite-compatible mutex locks table
+model MutexLock {
+  lock_key    String   @id
+  acquired_at DateTime @default(now())
+  expires_at  DateTime
+
+  @@map("_mutex_locks")
+}

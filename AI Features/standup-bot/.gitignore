@@ -1,0 +1,30 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.production.local
+.env.test.local
+
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+.DS_Store
+.vscode/
+.idea/
+
+coverage/
+
+# Database files
+*.db
+*.db.backup
+*.sqlite
+
+# Test files
+test-*.js
+test-*.ts
+*-test.js
+
+# Temporary files
+*.tmp
+*.temp
