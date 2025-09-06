@@ -21,7 +21,7 @@ export default function ProjectMessagesPage() {
   const [project, setProject] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentUserId] = useState('1'); // TODO: Get from auth context
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>();
   const [messageStats, setMessageStats] = useState({ total: 0, replies: 0, today: 0 });
 
   const {
@@ -62,6 +62,13 @@ export default function ProjectMessagesPage() {
       try {
         setIsLoading(true);
         setError(null);
+
+        // Fetch current user data first
+        const authResponse = await fetch('/api/auth/me');
+        if (authResponse.ok) {
+          const authData = await authResponse.json();
+          setCurrentUserId(authData.user?.id);
+        }
 
         // Fetch project data
         const projectResponse = await fetch(`/api/projects/${projectId}`);

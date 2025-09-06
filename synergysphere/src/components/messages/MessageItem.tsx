@@ -4,7 +4,6 @@ import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { 
@@ -40,8 +39,8 @@ interface MessageItemProps {
 }
 
 const formatMessageContent = (content: string): string => {
-  // Simple @mention highlighting - replace with more sophisticated parsing
-  return content.replace(/@(\w+)/g, '<span class="text-blue-600 font-medium bg-blue-50 px-1 rounded">@$1</span>');
+  // Handle @mentions with spaces (like "@John Smith")
+  return content.replace(/@([\w\s]+?)(?=\s[a-z]|$)/g, '<span class="text-blue-600 font-medium bg-blue-50 px-1 rounded">@$1</span>');
 };
 
 export function MessageItem({
@@ -90,131 +89,172 @@ export function MessageItem({
   if (message.deletedAt) {
     return (
       <div className={cn(
-        "flex items-start space-x-3 py-2 opacity-60",
-        isReply && "ml-8",
+        "flex w-full mb-4 px-4",
+        isAuthor ? "justify-end" : "justify-start",
+        isReply && "ml-12",
         className
       )}>
-        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-          <Trash2 className="h-4 w-4 text-muted-foreground" />
-        </div>
-        <div className="flex-1">
-          <p className="text-sm text-muted-foreground italic">
-            This message was deleted
-          </p>
+        <div className="flex max-w-[70%] opacity-60">
+          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+            <Trash2 className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="ml-3 flex-1">
+            <p className="text-sm text-muted-foreground italic">
+              This message was deleted
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <Card className={cn(
-      "border-0 shadow-none bg-transparent",
-      isReply && "ml-8 border-l-2 border-muted pl-4 bg-muted/20",
+    <div className={cn(
+      "flex w-full mb-4 px-4 group",
+      isAuthor ? "justify-end" : "justify-start",
+      isReply && "ml-12",
       className
     )}>
-      <CardContent className="p-4">
-        <div className="flex items-start space-x-3">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={message.author.avatarUrl} alt={message.author.name} />
-            <AvatarFallback className="text-xs">
-              {message.author.name.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+      <div className={cn(
+        "flex max-w-[75%] min-w-[200px]",
+        isAuthor ? "flex-row-reverse" : "flex-row"
+      )}>
+        {/* Avatar */}
+        <Avatar className="h-8 w-8 flex-shrink-0">
+          <AvatarImage src={message.author.avatarUrl} alt={message.author.name} />
+          <AvatarFallback className="text-xs">
+            {message.author.name.charAt(0).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
 
-          <div className="flex-1 min-w-0">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="font-medium text-sm">{message.author.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  <Clock className="inline h-3 w-3 mr-1" />
-                  {formatDistanceToNow(new Date(message.createdAt), { addSuffix: true })}
-                </span>
-                {message.isEdited && (
-                  <Badge variant="secondary" className="text-xs">
-                    <Edit2 className="h-3 w-3 mr-1" />
-                    edited
-                  </Badge>
-                )}
-              </div>
+        {/* Message Content */}
+        <div className={cn(
+          "flex flex-col",
+          isAuthor ? "mr-3 items-end" : "ml-3 items-start"
+        )}>
+          {/* Author and Time */}
+          <div className={cn(
+            "flex items-center gap-2 mb-1",
+            isAuthor ? "flex-row-reverse" : "flex-row"
+          )}>
+            <span className="text-sm font-medium text-muted-foreground">
+              {message.author.name}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {formatDistanceToNow(new Date(message.createdAt), { addSuffix: true })}
+            </span>
+            {message.isEdited && (
+              <Badge variant="outline" className="text-xs">
+                edited
+              </Badge>
+            )}
+          </div>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {showReplyButton && onReply && (
-                    <DropdownMenuItem onClick={() => onReply(message)}>
-                      <Reply className="h-4 w-4 mr-2" />
-                      Reply
-                    </DropdownMenuItem>
+          {/* Message Bubble */}
+          <div className={cn(
+            "relative rounded-2xl px-4 py-3 max-w-full break-words",
+            isAuthor 
+              ? "bg-primary text-primary-foreground rounded-br-md" 
+              : "bg-muted text-muted-foreground rounded-bl-md",
+            "shadow-sm"
+          )}>
+            {/* Message Actions Button */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className={cn(
+                    "absolute -top-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity",
+                    isAuthor ? "-left-2" : "-right-2"
                   )}
-                  <DropdownMenuItem onClick={() => setShowReactions(!showReactions)}>
-                    <Heart className="h-4 w-4 mr-2" />
-                    Add Reaction
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align={isAuthor ? "start" : "end"}>
+                {showReplyButton && onReply && (
+                  <DropdownMenuItem onClick={() => onReply(message)}>
+                    <Reply className="h-4 w-4 mr-2" />
+                    Reply
                   </DropdownMenuItem>
-                  {canEdit && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                        <Edit2 className="h-4 w-4 mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  {canDelete && onDelete && (
-                    <DropdownMenuItem 
-                      className="text-destructive"
-                      onClick={() => onDelete(message)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
+                )}
+                <DropdownMenuItem onClick={() => setShowReactions(!showReactions)}>
+                  <Heart className="h-4 w-4 mr-2" />
+                  Add Reaction
+                </DropdownMenuItem>
+                {canEdit && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                      <Edit2 className="h-4 w-4 mr-2" />
+                      Edit
                     </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                  </>
+                )}
+                {canDelete && onDelete && (
+                  <DropdownMenuItem 
+                    className="text-destructive"
+                    onClick={() => onDelete(message)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-            {/* Content */}
-            <div className="mt-1">
-              {isEditing ? (
-                <div className="space-y-2">
-                  <Textarea
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    className="min-h-[60px] resize-none"
-                    placeholder="Edit your message..."
-                    autoFocus
-                  />
-                  <div className="flex justify-end space-x-2">
-                    <Button size="sm" variant="outline" onClick={handleCancelEdit}>
-                      Cancel
-                    </Button>
-                    <Button size="sm" onClick={handleSaveEdit}>
-                      <Check className="h-4 w-4 mr-1" />
-                      Save
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className="text-sm prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ 
-                    __html: formatMessageContent(message.content) 
-                  }}
+            {/* Edit Mode */}
+            {isEditing ? (
+              <div className="space-y-2">
+                <Textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="min-h-[60px] resize-none border-0 bg-transparent p-0 text-inherit placeholder:text-muted-foreground/60 focus-visible:ring-0"
+                  placeholder="Edit your message..."
                 />
-              )}
-            </div>
+                <div className="flex space-x-2">
+                  <Button size="sm" onClick={handleSaveEdit}>
+                    <Check className="h-4 w-4 mr-1" />
+                    Save
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              /* Normal Message Content */
+              <div
+                className="prose prose-sm max-w-none text-inherit"
+                dangerouslySetInnerHTML={{
+                  __html: formatMessageContent(message.content)
+                }}
+              />
+            )}
+          </div>
 
-            {/* Reactions */}
-            {message.reactions && message.reactions.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {message.reactions.reduce((acc, reaction) => {
+          {/* Reply Count */}
+          {message.replyCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-2 h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => onReply && onReply(message)}
+            >
+              <MessageSquare className="h-3 w-3 mr-1" />
+              {message.replyCount} {message.replyCount === 1 ? 'reply' : 'replies'}
+            </Button>
+          )}
+
+          {/* Reactions */}
+          {message.reactions && message.reactions.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {message.reactions
+                .reduce((acc: any[], reaction) => {
                   const existing = acc.find(r => r.emoji === reaction.emoji);
                   if (existing) {
-                    existing.count++;
+                    existing.count += 1;
                     existing.users.push(reaction.userName);
                   } else {
                     acc.push({
@@ -224,85 +264,61 @@ export function MessageItem({
                     });
                   }
                   return acc;
-                }, [] as Array<{ emoji: string; count: number; users: string[] }>)
-                .map(({ emoji, count, users }) => (
-                  <Badge 
-                    key={emoji}
-                    variant="secondary" 
-                    className="cursor-pointer hover:bg-secondary/80 px-2 py-1"
-                    onClick={() => handleReaction(emoji)}
-                    title={`${users.join(', ')} reacted with ${emoji}`}
+                }, [])
+                .map((reaction) => (
+                  <Badge
+                    key={reaction.emoji}
+                    variant="outline"
+                    className="text-xs cursor-pointer hover:bg-accent"
+                    onClick={() => handleReaction(reaction.emoji)}
                   >
-                    {emoji} {count}
+                    {reaction.emoji} {reaction.count}
                   </Badge>
-                ))}
-              </div>
-            )}
+                ))
+              }
+            </div>
+          )}
 
-            {/* Emoji Picker */}
-            {showReactions && (
-              <div className="flex gap-2 mt-2 p-2 bg-muted rounded-md">
-                {popularEmojis.map((emoji) => (
-                  <Button
-                    key={emoji}
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 hover:bg-background"
-                    onClick={() => handleReaction(emoji)}
-                  >
-                    {emoji}
-                  </Button>
-                ))}
-              </div>
-            )}
+          {/* Quick Reactions */}
+          {showReactions && (
+            <div className="flex gap-1 mt-2">
+              {popularEmojis.map((emoji) => (
+                <Button
+                  key={emoji}
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => handleReaction(emoji)}
+                >
+                  {emoji}
+                </Button>
+              ))}
+            </div>
+          )}
 
-            {/* Reply count indicator */}
-            {message.replyCount > 0 && !isReply && showReplyButton && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="mt-2 text-muted-foreground hover:text-foreground"
-                onClick={() => onReply && onReply(message)}
-              >
-                <MessageSquare className="h-4 w-4 mr-1" />
-                {message.replyCount} {message.replyCount === 1 ? 'reply' : 'replies'}
-              </Button>
-            )}
-
-            {/* Mentions */}
-            {message.mentions.length > 0 && (
-              <div className="mt-2">
-                <div className="flex flex-wrap gap-1">
-                  {message.mentionedUsers?.map((user) => (
-                    <Badge key={user.id} variant="outline" className="text-xs">
-                      @{user.name}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Attachments */}
-            {message.attachments && message.attachments.length > 0 && (
-              <div className="mt-3 space-y-2">
-                {message.attachments.map((attachment) => (
-                  <div key={attachment.id} className="flex items-center space-x-2 p-2 bg-muted rounded">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{attachment.fileName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {(attachment.fileSize / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Download
-                    </Button>
+          {/* Attachments */}
+          {message.attachments && message.attachments.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {message.attachments.map((attachment) => (
+                <div key={attachment.id} className={cn(
+                  "flex items-center space-x-2 p-3 rounded-lg border",
+                  isAuthor ? "bg-primary/10" : "bg-muted"
+                )}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{attachment.fileName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(attachment.fileSize / 1024 / 1024).toFixed(2)} MB
+                    </p>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <Button variant="outline" size="sm">
+                    Download
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

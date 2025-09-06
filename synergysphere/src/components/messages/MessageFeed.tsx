@@ -336,38 +336,52 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
         {/* Messages */}
         <ScrollArea 
           ref={scrollAreaRef}
-          className="flex-1 p-4"
+          className="flex-1 min-h-0"
           onScrollCapture={handleScroll}
         >
-          <div className="space-y-4">
-            {rootMessages.map((message) => (
-              <MessageItem
-                key={message.id}
-                message={message}
-                currentUserId={currentUserId}
-                onReply={handleReplyToMessage}
-                onEdit={handleEditMessage}
-                onDelete={handleDeleteMessage}
-                onReaction={handleReaction}
-              />
-            ))}
-
-            {/* Typing indicators */}
-            {currentTypingUsers.length > 0 && (
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse" />
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
+          <div className="flex flex-col justify-end min-h-full">
+            {rootMessages.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center text-muted-foreground">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No messages yet</p>
+                  <p className="text-sm">Start the conversation!</p>
                 </div>
-                <span>
-                  {currentTypingUsers.map(u => u.userName).join(', ')} 
-                  {currentTypingUsers.length === 1 ? ' is' : ' are'} typing...
-                </span>
+              </div>
+            ) : (
+              <div className="flex flex-col pt-4">
+                {rootMessages.map((message) => (
+                  <MessageItem
+                    key={message.id}
+                    message={message}
+                    currentUserId={currentUserId}
+                    onReply={handleReplyToMessage}
+                    onEdit={handleEditMessage}
+                    onDelete={handleDeleteMessage}
+                    onReaction={handleReaction}
+                  />
+                ))}
+
+                {/* Typing indicators */}
+                {currentTypingUsers.length > 0 && (
+                  <div className="flex justify-start px-4 mb-4">
+                    <div className="flex items-center space-x-3 bg-muted rounded-2xl rounded-bl-md px-4 py-3">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse" />
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
+                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        {currentTypingUsers.map(u => u.userName).join(', ')} 
+                        {currentTypingUsers.length === 1 ? ' is' : ' are'} typing...
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={bottomRef} />
               </div>
             )}
-
-            <div ref={bottomRef} />
           </div>
         </ScrollArea>
 
