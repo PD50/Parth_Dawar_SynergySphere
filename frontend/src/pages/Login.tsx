@@ -9,6 +9,9 @@ const Login: React.FC = () => {
   const { login, isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  console.log('[LOGIN] Login component rendered');
+  console.log('[LOGIN] IsAuthenticated:', isAuthenticated);
   
   // Handle successful Google OAuth login
   const handleLoginSuccess = async (tokenResponse: any) => {
@@ -66,6 +69,12 @@ const Login: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  // Handle clear stored auth data
+  const handleClearAuth = () => {
+    localStorage.removeItem('motion-gpt-auth');
+    window.location.reload();
+  };
   
   // Check for token in URL when coming from OAuth callback
   useEffect(() => {
@@ -95,7 +104,10 @@ const Login: React.FC = () => {
   // Redirect to dashboard if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
+      console.log('[LOGIN] User is authenticated, redirecting to dashboard');
       navigate('/dashboard');
+    } else {
+      console.log('[LOGIN] User is not authenticated, showing login page');
     }
   }, [isAuthenticated, navigate]);
   
@@ -152,6 +164,15 @@ const Login: React.FC = () => {
                 className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
                 {isLoading ? 'Signing in...' : 'Skip Login (Testing)'}
+              </button>
+            </div>
+
+            <div>
+              <button
+                onClick={handleClearAuth}
+                className="w-full flex justify-center py-2 px-4 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                Clear Stored Auth Data
               </button>
             </div>
 

@@ -18,24 +18,56 @@ const Dashboard: React.FC = () => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        
+
+        // Check if using mock token (backend not available)
+        const token = localStorage.getItem('motion-gpt-auth') ?
+          JSON.parse(localStorage.getItem('motion-gpt-auth')!).state.token : null;
+
+        if (token === 'mock-jwt-token-for-testing') {
+          // Use mock data for testing
+          console.log('[DASHBOARD] Using mock data for testing');
+          setRecentProjects([
+            {
+              _id: 'mock-project-1',
+              name: 'Sample Project',
+              description: 'This is a sample project for testing purposes.',
+              status: 'in-progress'
+            }
+          ]);
+          setAssignedTasks([
+            {
+              _id: 'mock-task-1',
+              title: 'Sample Task',
+              description: 'This is a sample task for testing.',
+              status: 'in-progress',
+              priority: 'medium',
+              project: { _id: 'mock-project-1', name: 'Sample Project' }
+            }
+          ]);
+          setLoading(false);
+          return;
+        }
+
         // Fetch recent projects
         const projectsData = await projectApi.getProjects();
         setRecentProjects(projectsData.slice(0, 3)); // Get 3 most recent projects
-        
+
         // Fetch assigned tasks
         const tasksData = await taskApi.getTasks();
-        setAssignedTasks(tasksData.filter((task: any) => 
+        setAssignedTasks(tasksData.filter((task: any) =>
           task.assignedTo?._id === user?.id && task.status !== 'completed'
         ).slice(0, 5)); // Get 5 most recent incomplete tasks
-        
+
         setLoading(false);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        // Show empty state instead of error
+        setRecentProjects([]);
+        setAssignedTasks([]);
         setLoading(false);
       }
     };
-    
+
     fetchDashboardData();
   }, [user]);
   

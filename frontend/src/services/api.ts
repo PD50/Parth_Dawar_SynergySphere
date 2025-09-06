@@ -1,11 +1,8 @@
 import axios from 'axios';
 import { useAuthStore } from '../hooks/useAuth';
 
-// Set base URL - check if we're in development or production
-// In a real setup, you'd get this from environment variables
-const API_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://api.motion-gpt.com' 
-  : 'http://localhost:5000';
+// Set base URL from environment variables
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000';
 
 console.log('[API] Using API URL:', API_URL);
 

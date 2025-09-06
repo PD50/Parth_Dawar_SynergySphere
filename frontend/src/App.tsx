@@ -17,6 +17,12 @@ function App() {
   const { user, loading, token, fetchUser } = useAuth();
   const [isInitializing, setIsInitializing] = useState(true);
 
+  console.log('[APP] App component rendered');
+  console.log('[APP] User:', user);
+  console.log('[APP] Token:', token);
+  console.log('[APP] Loading:', loading);
+  console.log('[APP] IsInitializing:', isInitializing);
+
   // Initialize auth state when app loads
   useEffect(() => {
     const initAuth = async () => {
