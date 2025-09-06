@@ -61,11 +61,15 @@ export default function ProjectDetailPage() {
     return null;
   }
 
+  // Extract current user's role from the project data
+  const currentUserRole = data.project.userRole || 'MEMBER';
+
   return (
     <ProjectOverview
       project={data.project}
       members={data.members}
       recentActivity={data.recentActivity}
+      currentUserRole={currentUserRole}
       onEdit={() => {
         // Handle edit functionality
         console.log("Edit project:", data.project.id);

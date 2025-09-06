@@ -142,6 +142,12 @@ export async function GET(
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 10);
 
+    // Find current user's role in this project
+    const currentUserMembership = project.memberships.find(
+      membership => membership.userId === authResult.userId
+    );
+    const currentUserRole = currentUserMembership?.role || 'MEMBER';
+
     // Transform project data
     const transformedProject = {
       project: {
@@ -156,6 +162,7 @@ export async function GET(
         totalMembers: project._count.memberships,
         deadline: null, // Add deadline field to schema if needed
         createdAt: project.createdAt.toISOString(),
+        userRole: currentUserRole, // Add current user's role
       },
       members,
       recentActivity,

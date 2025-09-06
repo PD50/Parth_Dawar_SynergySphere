@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ProjectForm } from "./project-form";
 import { 
   MoreHorizontal, 
@@ -227,6 +227,7 @@ export function ProjectList({ projects, onProjectUpdate }: ProjectListProps) {
         onOpenChange={(open) => !open && setEditingProject(null)}
       >
         <DialogContent className="max-w-2xl">
+          <DialogTitle>Edit Project</DialogTitle>
           {editingProject && (
             <ProjectForm
               initialData={editingProject}
