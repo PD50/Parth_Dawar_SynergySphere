@@ -7,6 +7,13 @@ interface UseSocketOptions {
   onTaskCreate?: (task: any) => void;
   onTaskDelete?: (taskId: string) => void;
   onTaskMove?: (taskId: string, newStatus: string) => void;
+  // Message events
+  onMessageCreate?: (message: any) => void;
+  onMessageUpdate?: (message: any) => void;
+  onMessageDelete?: (messageId: string) => void;
+  // Notification events  
+  onNotificationCreate?: (notification: any) => void;
+  onNotificationUpdate?: (notification: any) => void;
 }
 
 export function useSocket({
@@ -15,6 +22,11 @@ export function useSocket({
   onTaskCreate,
   onTaskDelete,
   onTaskMove,
+  onMessageCreate,
+  onMessageUpdate, 
+  onMessageDelete,
+  onNotificationCreate,
+  onNotificationUpdate,
 }: UseSocketOptions) {
   const socketRef = useRef<Socket | null>(null);
 
@@ -48,6 +60,28 @@ export function useSocket({
           onTaskMove(taskId, newStatus);
         });
       }
+      
+      // Listen for message events
+      if (onMessageCreate) {
+        socket.on('message:created', onMessageCreate);
+      }
+      
+      if (onMessageUpdate) {
+        socket.on('message:updated', onMessageUpdate);
+      }
+      
+      if (onMessageDelete) {
+        socket.on('message:deleted', onMessageDelete);
+      }
+      
+      // Listen for notification events
+      if (onNotificationCreate) {
+        socket.on('notification:created', onNotificationCreate);
+      }
+      
+      if (onNotificationUpdate) {
+        socket.on('notification:updated', onNotificationUpdate);
+      }
 
       // Handle connection events
       socket.on('connect', () => {
@@ -72,7 +106,7 @@ export function useSocket({
         socketRef.current.disconnect();
       }
     };
-  }, [projectId, onTaskUpdate, onTaskCreate, onTaskDelete, onTaskMove]);
+  }, [projectId, onTaskUpdate, onTaskCreate, onTaskDelete, onTaskMove, onMessageCreate, onMessageUpdate, onMessageDelete, onNotificationCreate, onNotificationUpdate]);
 
   // Emit task events
   const emitTaskUpdate = (taskId: string, updates: any) => {
@@ -103,6 +137,32 @@ export function useSocket({
       });
     }
   };
+  
+  // Emit message events
+  const emitMessageCreate = (message: any) => {
+    if (socketRef.current) {
+      socketRef.current.emit('message:create', { message, projectId });
+    }
+  };
+  
+  const emitMessageUpdate = (messageId: string, updates: any) => {
+    if (socketRef.current) {
+      socketRef.current.emit('message:update', { messageId, updates, projectId });
+    }
+  };
+  
+  const emitMessageDelete = (messageId: string) => {
+    if (socketRef.current) {
+      socketRef.current.emit('message:delete', { messageId, projectId });
+    }
+  };
+  
+  // Emit notification events
+  const emitNotificationUpdate = (notificationId: string, updates: any) => {
+    if (socketRef.current) {
+      socketRef.current.emit('notification:update', { notificationId, updates });
+    }
+  };
 
   return {
     socket: socketRef.current,
@@ -110,5 +170,9 @@ export function useSocket({
     emitTaskCreate,
     emitTaskDelete,
     emitTaskMove,
+    emitMessageCreate,
+    emitMessageUpdate,
+    emitMessageDelete,
+    emitNotificationUpdate,
   };
 }
