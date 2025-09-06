@@ -1,130 +1,124 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
-import { Message, MessageFilters } from '@/types/messages';
-
-// Mock database functions - replace with actual database implementation
-const mockMessages: Message[] = [
-  {
-    id: '1',
-    content: 'Hey team! Just wanted to update everyone on the current sprint progress. We\'re making great progress on the authentication system.',
-    authorId: '1',
-    projectId: '1',
-    mentions: ['2', '3'],
-    attachments: [],
-    reactions: [
-      { id: '1', emoji: '👍', userId: '2', userName: 'Bob Smith', createdAt: new Date('2024-01-25T10:30:00Z') },
-      { id: '2', emoji: '🚀', userId: '3', userName: 'Carol Davis', createdAt: new Date('2024-01-25T10:35:00Z') }
-    ],
-    createdAt: new Date('2024-01-25T09:00:00Z'),
-    updatedAt: new Date('2024-01-25T09:00:00Z'),
-    author: {
-      id: '1',
-      name: 'Alice Johnson',
-      email: 'alice@synergysphere.com',
-      avatarUrl: ''
-    },
-    replies: [],
-    mentionedUsers: [
-      { id: '2', name: 'Bob Smith', email: 'bob@synergysphere.com' },
-      { id: '3', name: 'Carol Davis', email: 'carol@synergysphere.com' }
-    ],
-    isEdited: false,
-    replyCount: 2
-  },
-  {
-    id: '2',
-    content: 'Thanks for the update @alice! The login flow is working smoothly on my end. Should we schedule a review session for the API endpoints?',
-    authorId: '2',
-    projectId: '1',
-    parentId: '1',
-    threadId: '1',
-    mentions: ['1'],
-    attachments: [],
-    reactions: [],
-    createdAt: new Date('2024-01-25T09:15:00Z'),
-    updatedAt: new Date('2024-01-25T09:15:00Z'),
-    author: {
-      id: '2',
-      name: 'Bob Smith',
-      email: 'bob@synergysphere.com',
-      avatarUrl: ''
-    },
-    replies: [],
-    mentionedUsers: [
-      { id: '1', name: 'Alice Johnson', email: 'alice@synergysphere.com' }
-    ],
-    isEdited: false,
-    replyCount: 0
-  }
-];
-
-const mockProjectMembers = [
-  { id: '1', name: 'Alice Johnson', email: 'alice@synergysphere.com', avatarUrl: '' },
-  { id: '2', name: 'Bob Smith', email: 'bob@synergysphere.com', avatarUrl: '' },
-  { id: '3', name: 'Carol Davis', email: 'carol@synergysphere.com', avatarUrl: '' },
-  { id: '4', name: 'David Wilson', email: 'david@synergysphere.com', avatarUrl: '' },
-];
+import { prisma } from '@/lib/prisma';
+import { MessageFilters } from '@/types/messages';
 
 async function getProjectMessages(
   projectId: string,
   filters: MessageFilters = {},
   limit: number = 50,
   cursor?: string
-): Promise<{ messages: Message[], hasMore: boolean, nextCursor?: string }> {
-  // In a real app, this would query the database
-  let filteredMessages = mockMessages.filter(message => message.projectId === projectId);
+) {
+  const where: any = {
+    projectId,
+    deletedAt: null, // Only get non-deleted messages
+  };
 
   // Apply filters
   if (filters.search) {
-    const searchTerm = filters.search.toLowerCase();
-    filteredMessages = filteredMessages.filter(message =>
-      message.content.toLowerCase().includes(searchTerm) ||
-      message.author.name.toLowerCase().includes(searchTerm)
-    );
+    where.content = {
+      contains: filters.search,
+      mode: 'insensitive',
+    };
   }
 
   if (filters.authorId) {
-    filteredMessages = filteredMessages.filter(message => message.authorId === filters.authorId);
-  }
-
-  if (filters.hasAttachments) {
-    filteredMessages = filteredMessages.filter(message => 
-      message.attachments && message.attachments.length > 0
-    );
+    where.authorId = filters.authorId;
   }
 
   if (filters.onlyMentions) {
-    // Filter for messages where the current user is mentioned
-    // This would need the current user ID from the auth context
-    filteredMessages = filteredMessages.filter(message => 
-      message.mentions && message.mentions.length > 0
-    );
+    where.mentions = {
+      not: [],
+    };
   }
 
   if (filters.dateFrom) {
-    filteredMessages = filteredMessages.filter(message =>
-      new Date(message.createdAt) >= new Date(filters.dateFrom!)
-    );
+    where.createdAt = {
+      ...where.createdAt,
+      gte: new Date(filters.dateFrom),
+    };
   }
 
   if (filters.dateTo) {
-    filteredMessages = filteredMessages.filter(message =>
-      new Date(message.createdAt) <= new Date(filters.dateTo!)
-    );
+    where.createdAt = {
+      ...where.createdAt,
+      lte: new Date(filters.dateTo),
+    };
   }
 
-  // Sort by creation date (newest first)
-  filteredMessages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  // Cursor-based pagination
+  const cursorCondition = cursor ? { id: cursor } : undefined;
 
-  // Implement pagination
-  const startIndex = cursor ? filteredMessages.findIndex(m => m.id === cursor) + 1 : 0;
-  const endIndex = startIndex + limit;
-  const paginatedMessages = filteredMessages.slice(startIndex, endIndex);
+  const messages = await prisma.message.findMany({
+    where,
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+      reactions: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+      _count: {
+        select: {
+          replies: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: limit + 1, // Take one extra to check if there are more
+    cursor: cursorCondition,
+    skip: cursor ? 1 : 0, // Skip the cursor item
+  });
+
+  const hasMore = messages.length > limit;
+  const items = hasMore ? messages.slice(0, limit) : messages;
+
+  // Transform to match our Message interface
+  const transformedMessages = items.map((message: any) => ({
+    id: message.id,
+    content: message.content,
+    authorId: message.authorId,
+    projectId: message.projectId,
+    parentId: message.parentId,
+    threadId: message.threadId,
+    mentions: message.mentions,
+    attachments: message.attachments,
+    reactions: message.reactions.map((reaction: any) => ({
+      id: reaction.id,
+      emoji: reaction.emoji,
+      userId: reaction.userId,
+      userName: reaction.user.name,
+      createdAt: reaction.createdAt,
+    })),
+    createdAt: message.createdAt,
+    updatedAt: message.updatedAt,
+    editedAt: message.editedAt,
+    deletedAt: message.deletedAt,
+    author: message.author,
+    replies: [],
+    mentionedUsers: [], // Will be populated if needed
+    isEdited: message.isEdited,
+    replyCount: message._count.replies,
+  }));
 
   return {
-    messages: paginatedMessages,
-    hasMore: endIndex < filteredMessages.length,
-    nextCursor: paginatedMessages.length > 0 ? paginatedMessages[paginatedMessages.length - 1].id : undefined
+    messages: transformedMessages,
+    hasMore,
+    nextCursor: hasMore ? items[items.length - 1].id : undefined,
   };
 }
 
@@ -134,49 +128,161 @@ async function createMessage(projectId: string, messageData: {
   threadId?: string;
   mentions?: string[];
   attachments?: any[];
-}, authorId: string): Promise<Message> {
+}, authorId: string) {
   // Extract mentions from content (simple implementation)
   const mentionRegex = /@(\w+)/g;
   const contentMentions: string[] = [];
   let match;
+  
   while ((match = mentionRegex.exec(messageData.content)) !== null) {
-    const mentionedUser = mockProjectMembers.find(member => 
-      member.name.toLowerCase().includes(match[1].toLowerCase())
-    );
-    if (mentionedUser && !contentMentions.includes(mentionedUser.id)) {
-      contentMentions.push(mentionedUser.id);
-    }
+    // Look up users by name
+    const mentionedUsers = await prisma.user.findMany({
+      where: {
+        name: {
+          contains: match[1],
+          mode: 'insensitive',
+        },
+      },
+      select: { id: true },
+    });
+    
+    mentionedUsers.forEach(user => {
+      if (!contentMentions.includes(user.id)) {
+        contentMentions.push(user.id);
+      }
+    });
   }
 
   const mentions = [...(messageData.mentions || []), ...contentMentions];
   const uniqueMentions = [...new Set(mentions)];
 
-  const newMessage: Message = {
-    id: Math.random().toString(36).substr(2, 9),
-    content: messageData.content,
-    authorId,
-    projectId,
-    parentId: messageData.parentId,
-    threadId: messageData.threadId || messageData.parentId,
-    mentions: uniqueMentions,
-    attachments: messageData.attachments || [],
-    reactions: [],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    author: mockProjectMembers.find(member => member.id === authorId)!,
+  // Set threadId - if this is a reply, use the parentId's threadId or the parentId itself
+  let finalThreadId = messageData.threadId;
+  if (messageData.parentId && !finalThreadId) {
+    const parentMessage = await prisma.message.findUnique({
+      where: { id: messageData.parentId },
+      select: { threadId: true, id: true },
+    });
+    finalThreadId = parentMessage?.threadId || parentMessage?.id;
+  }
+
+  const newMessage = await prisma.message.create({
+    data: {
+      content: messageData.content,
+      authorId,
+      projectId,
+      parentId: messageData.parentId,
+      threadId: finalThreadId,
+      mentions: uniqueMentions.length > 0 ? uniqueMentions : [],
+      attachments: messageData.attachments && messageData.attachments.length > 0 ? messageData.attachments : [],
+    },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+      reactions: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+      _count: {
+        select: {
+          replies: true,
+        },
+      },
+    },
+  });
+
+  // Create notifications for mentioned users
+  if (uniqueMentions.length > 0) {
+    const mentionNotifications = uniqueMentions
+      .filter(userId => userId !== authorId) // Don't notify yourself
+      .map(userId => ({
+        userId,
+        fromUserId: authorId,
+        projectId,
+        type: 'mention',
+        title: 'You were mentioned',
+        message: `${newMessage.author.name} mentioned you in a message`,
+        data: {
+          messageId: newMessage.id,
+          messageContent: newMessage.content.slice(0, 100),
+          threadId: finalThreadId,
+          url: `/dashboard/projects/${projectId}/messages?thread=${finalThreadId}`,
+        },
+      }));
+
+    if (mentionNotifications.length > 0) {
+      await prisma.notification.createMany({
+        data: mentionNotifications,
+      });
+    }
+  }
+
+  // Create reply notification if this is a reply
+  if (messageData.parentId) {
+    const parentMessage = await prisma.message.findUnique({
+      where: { id: messageData.parentId },
+      select: { authorId: true },
+    });
+
+    if (parentMessage && parentMessage.authorId !== authorId) {
+      await prisma.notification.create({
+        data: {
+          userId: parentMessage.authorId,
+          fromUserId: authorId,
+          projectId,
+          type: 'reply',
+          title: 'New reply to your message',
+          message: `${newMessage.author.name} replied to your message`,
+          data: {
+            messageId: newMessage.id,
+            messageContent: newMessage.content.slice(0, 100),
+            threadId: finalThreadId,
+            url: `/dashboard/projects/${projectId}/messages?thread=${finalThreadId}`,
+          },
+        },
+      });
+    }
+  }
+
+  // Transform to match our Message interface
+  return {
+    id: newMessage.id,
+    content: newMessage.content,
+    authorId: newMessage.authorId,
+    projectId: newMessage.projectId,
+    parentId: newMessage.parentId,
+    threadId: newMessage.threadId,
+    mentions: newMessage.mentions,
+    attachments: newMessage.attachments,
+    reactions: newMessage.reactions.map((reaction: any) => ({
+      id: reaction.id,
+      emoji: reaction.emoji,
+      userId: reaction.userId,
+      userName: reaction.user.name,
+      createdAt: reaction.createdAt,
+    })),
+    createdAt: newMessage.createdAt,
+    updatedAt: newMessage.updatedAt,
+    editedAt: newMessage.editedAt,
+    deletedAt: newMessage.deletedAt,
+    author: newMessage.author,
     replies: [],
-    mentionedUsers: uniqueMentions.map(id => mockProjectMembers.find(member => member.id === id)!).filter(Boolean),
-    isEdited: false,
-    replyCount: 0
+    mentionedUsers: [], // Could be populated from mentions array
+    isEdited: newMessage.isEdited,
+    replyCount: newMessage._count.replies,
   };
-
-  // Add to mock database
-  mockMessages.push(newMessage);
-
-  // TODO: Create notifications for mentioned users
-  // TODO: Update thread reply count if this is a reply
-  
-  return newMessage;
 }
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -196,7 +302,6 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const filters: MessageFilters = {
       search: searchParams.get('search') || undefined,
       authorId: searchParams.get('authorId') || undefined,
-      hasAttachments: searchParams.get('hasAttachments') === 'true',
       onlyMentions: searchParams.get('onlyMentions') === 'true',
       dateFrom: searchParams.get('dateFrom') ? new Date(searchParams.get('dateFrom')!) : undefined,
       dateTo: searchParams.get('dateTo') ? new Date(searchParams.get('dateTo')!) : undefined,
@@ -205,7 +310,20 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const limit = parseInt(searchParams.get('limit') || '50');
     const cursor = searchParams.get('cursor') || undefined;
 
-    // TODO: Verify user has access to the project
+    // Verify user has access to the project
+    const membership = await prisma.membership.findFirst({
+      where: {
+        projectId,
+        userId: authResult.userId,
+      },
+    });
+
+    if (!membership) {
+      return NextResponse.json(
+        { error: 'You do not have access to this project' },
+        { status: 403 }
+      );
+    }
 
     const result = await getProjectMessages(projectId, filters, limit, cursor);
 
@@ -254,15 +372,45 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       );
     }
 
-    // TODO: Verify user has access to the project
-    // TODO: If parentId is provided, verify the parent message exists
+    // Verify user has access to the project
+    const membership = await prisma.membership.findFirst({
+      where: {
+        projectId,
+        userId: authResult.userId,
+      },
+    });
+
+    if (!membership) {
+      return NextResponse.json(
+        { error: 'You do not have access to this project' },
+        { status: 403 }
+      );
+    }
+
+    // If parentId is provided, verify the parent message exists and belongs to the same project
+    if (body.parentId) {
+      const parentMessage = await prisma.message.findFirst({
+        where: {
+          id: body.parentId,
+          projectId,
+          deletedAt: null,
+        },
+      });
+
+      if (!parentMessage) {
+        return NextResponse.json(
+          { error: 'Parent message not found or does not belong to this project' },
+          { status: 400 }
+        );
+      }
+    }
 
     const messageData = {
       content: body.content.trim(),
       parentId: body.parentId,
       threadId: body.threadId,
       mentions: body.mentions,
-      attachments: body.attachments
+      attachments: body.attachments,
     };
 
     const message = await createMessage(projectId, messageData, authResult.userId);

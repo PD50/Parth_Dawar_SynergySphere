@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { authService } from '@/lib/auth';
 import { z } from 'zod';
-
-const prisma = new PrismaClient();
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),

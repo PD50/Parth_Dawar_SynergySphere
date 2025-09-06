@@ -1,31 +1,85 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
-import { Message } from '@/types/messages';
+import { prisma } from '@/lib/prisma';
 
-// Mock database - replace with actual database implementation
-const mockMessages: Message[] = []; // This should be the same array as in the project messages route
+async function getMessageById(messageId: string) {
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+      reactions: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+      _count: {
+        select: {
+          replies: true,
+        },
+      },
+    },
+  });
 
-const mockProjectMembers = [
-  { id: '1', name: 'Alice Johnson', email: 'alice@synergysphere.com', avatarUrl: '' },
-  { id: '2', name: 'Bob Smith', email: 'bob@synergysphere.com', avatarUrl: '' },
-  { id: '3', name: 'Carol Davis', email: 'carol@synergysphere.com', avatarUrl: '' },
-  { id: '4', name: 'David Wilson', email: 'david@synergysphere.com', avatarUrl: '' },
-];
+  if (!message || message.deletedAt) {
+    return null;
+  }
 
-async function getMessageById(messageId: string): Promise<Message | null> {
-  // In a real app, this would query the database
-  return mockMessages.find(message => message.id === messageId) || null;
+  // Transform to match our Message interface
+  return {
+    id: message.id,
+    content: message.content,
+    authorId: message.authorId,
+    projectId: message.projectId,
+    parentId: message.parentId,
+    threadId: message.threadId,
+    mentions: message.mentions,
+    attachments: message.attachments,
+    reactions: message.reactions.map((reaction: any) => ({
+      id: reaction.id,
+      emoji: reaction.emoji,
+      userId: reaction.userId,
+      userName: reaction.user.name,
+      createdAt: reaction.createdAt,
+    })),
+    createdAt: message.createdAt,
+    updatedAt: message.updatedAt,
+    editedAt: message.editedAt,
+    deletedAt: message.deletedAt,
+    author: message.author,
+    replies: [],
+    mentionedUsers: [], // Could be populated from mentions array
+    isEdited: message.isEdited,
+    replyCount: message._count.replies,
+  };
 }
 
 async function updateMessage(messageId: string, updates: {
   content?: string;
   mentions?: string[];
-}, userId: string): Promise<Message | null> {
-  const messageIndex = mockMessages.findIndex(message => message.id === messageId);
-  if (messageIndex === -1) return null;
+}, userId: string) {
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: {
+      author: { select: { id: true, name: true } },
+    },
+  });
 
-  const message = mockMessages[messageIndex];
-  
+  if (!message || message.deletedAt) {
+    return null;
+  }
+
   // Check if user is the author
   if (message.authorId !== userId) {
     throw new Error('Unauthorized: Only the message author can edit this message');
@@ -37,61 +91,161 @@ async function updateMessage(messageId: string, updates: {
     throw new Error('Message is too old to edit');
   }
 
-  // Update the message
+  const updateData: any = {
+    updatedAt: new Date(),
+    isEdited: true,
+    editedAt: new Date(),
+  };
+
   if (updates.content !== undefined) {
     // Extract mentions from content
     const mentionRegex = /@(\w+)/g;
     const contentMentions: string[] = [];
     let match;
+    
     while ((match = mentionRegex.exec(updates.content)) !== null) {
-      const mentionedUser = mockProjectMembers.find(member => 
-        member.name.toLowerCase().includes(match[1].toLowerCase())
-      );
-      if (mentionedUser && !contentMentions.includes(mentionedUser.id)) {
-        contentMentions.push(mentionedUser.id);
-      }
+      const mentionedUsers = await prisma.user.findMany({
+        where: {
+          name: {
+            contains: match[1],
+            mode: 'insensitive',
+          },
+        },
+        select: { id: true },
+      });
+      
+      mentionedUsers.forEach(user => {
+        if (!contentMentions.includes(user.id)) {
+          contentMentions.push(user.id);
+        }
+      });
     }
 
     const mentions = [...(updates.mentions || []), ...contentMentions];
     const uniqueMentions = [...new Set(mentions)];
 
-    message.content = updates.content;
-    message.mentions = uniqueMentions;
-    message.mentionedUsers = uniqueMentions
-      .map(id => mockProjectMembers.find(member => member.id === id)!)
-      .filter(Boolean);
+    updateData.content = updates.content;
+    updateData.mentions = uniqueMentions;
+
+    // Create notifications for newly mentioned users (not in original mentions)
+    const originalMentions = message.mentions as string[] || [];
+    const newMentions = uniqueMentions.filter(id => !originalMentions.includes(id));
+    
+    if (newMentions.length > 0) {
+      const mentionNotifications = newMentions
+        .filter(userId => userId !== message.authorId) // Don't notify yourself
+        .map(userId => ({
+          userId,
+          fromUserId: message.authorId,
+          projectId: message.projectId,
+          type: 'mention',
+          title: 'You were mentioned',
+          message: `${message.author.name} mentioned you in an edited message`,
+          data: {
+            messageId: message.id,
+            messageContent: updates.content!.slice(0, 100),
+            threadId: message.threadId,
+            url: `/dashboard/projects/${message.projectId}/messages?thread=${message.threadId}`,
+          },
+        }));
+
+      await prisma.notification.createMany({
+        data: mentionNotifications,
+      });
+    }
   }
 
-  message.updatedAt = new Date();
-  message.editedAt = new Date();
-  message.isEdited = true;
+  const updatedMessage = await prisma.message.update({
+    where: { id: messageId },
+    data: updateData,
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+      reactions: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+      _count: {
+        select: {
+          replies: true,
+        },
+      },
+    },
+  });
 
-  mockMessages[messageIndex] = message;
-
-  // TODO: Create notifications for newly mentioned users
-  // TODO: Emit real-time update
-
-  return message;
+  return {
+    id: updatedMessage.id,
+    content: updatedMessage.content,
+    authorId: updatedMessage.authorId,
+    projectId: updatedMessage.projectId,
+    parentId: updatedMessage.parentId,
+    threadId: updatedMessage.threadId,
+    mentions: updatedMessage.mentions,
+    attachments: updatedMessage.attachments,
+    reactions: updatedMessage.reactions.map((reaction: any) => ({
+      id: reaction.id,
+      emoji: reaction.emoji,
+      userId: reaction.userId,
+      userName: reaction.user.name,
+      createdAt: reaction.createdAt,
+    })),
+    createdAt: updatedMessage.createdAt,
+    updatedAt: updatedMessage.updatedAt,
+    editedAt: updatedMessage.editedAt,
+    deletedAt: updatedMessage.deletedAt,
+    author: updatedMessage.author,
+    replies: [],
+    mentionedUsers: [],
+    isEdited: updatedMessage.isEdited,
+    replyCount: updatedMessage._count.replies,
+  };
 }
 
 async function deleteMessage(messageId: string, userId: string): Promise<boolean> {
-  const messageIndex = mockMessages.findIndex(message => message.id === messageId);
-  if (messageIndex === -1) return false;
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+  });
 
-  const message = mockMessages[messageIndex];
-  
+  if (!message || message.deletedAt) {
+    return false;
+  }
+
   // Check if user is the author or has admin permissions
   if (message.authorId !== userId) {
     // TODO: Check if user is project admin
-    throw new Error('Unauthorized: Only the message author can delete this message');
+    const membership = await prisma.membership.findFirst({
+      where: {
+        projectId: message.projectId,
+        userId,
+        role: { in: ['owner', 'admin'] },
+      },
+    });
+
+    if (!membership) {
+      throw new Error('Unauthorized: Only the message author or project admin can delete this message');
+    }
   }
 
   // Soft delete - mark as deleted but keep in database
-  message.deletedAt = new Date();
-  message.content = '[This message was deleted]';
-  mockMessages[messageIndex] = message;
-
-  // TODO: Emit real-time update
+  await prisma.message.update({
+    where: { id: messageId },
+    data: {
+      deletedAt: new Date(),
+      content: '[This message was deleted]',
+    },
+  });
 
   return true;
 }
@@ -116,7 +270,20 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       );
     }
 
-    // TODO: Verify user has access to the project this message belongs to
+    // Verify user has access to the project this message belongs to
+    const membership = await prisma.membership.findFirst({
+      where: {
+        projectId: message.projectId,
+        userId: authResult.userId,
+      },
+    });
+
+    if (!membership) {
+      return NextResponse.json(
+        { error: 'You do not have access to this message' },
+        { status: 403 }
+      );
+    }
 
     return NextResponse.json(message);
   } catch (error) {
@@ -167,7 +334,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const updates = {
       content: body.content?.trim(),
-      mentions: body.mentions
+      mentions: body.mentions,
     };
 
     const updatedMessage = await updateMessage(messageId, updates, authResult.userId);

@@ -58,7 +58,10 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
     removeMessage,
     getTypingUsers,
     setCurrentThread,
-    currentThread
+    currentThread,
+    setMessages,
+    setLoading,
+    setError
   } = useMessageStore();
 
   // Get filtered messages for the current project
@@ -79,6 +82,33 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
     );
   }, [getTypingUsers, projectId, currentUserId]);
 
+  // Load messages for the project
+  const loadMessages = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/projects/${projectId}/messages?limit=50`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load messages: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      setMessages(data.messages || []);
+    } catch (error) {
+      console.error('Failed to load messages:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load messages');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load messages when component mounts or projectId changes
+  useEffect(() => {
+    if (projectId) {
+      loadMessages();
+    }
+  }, [projectId]);
+
   // Handle scroll to detect when user is at bottom
   const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
@@ -95,36 +125,17 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
 
   const handleSendMessage = async (content: string) => {
     try {
-      // In a real app, this would make an API call
-      // const response = await fetch(`/api/projects/${projectId}/messages`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ content })
-      // });
-      // const newMessage = await response.json();
+      const response = await fetch(`/api/projects/${projectId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+      });
 
-      // Mock implementation
-      const newMessage: Message = {
-        id: Math.random().toString(36).substr(2, 9),
-        content,
-        authorId: currentUserId || '1',
-        projectId,
-        mentions: [],
-        attachments: [],
-        reactions: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        author: {
-          id: currentUserId || '1',
-          name: 'Current User',
-          email: 'user@example.com'
-        },
-        replies: [],
-        mentionedUsers: [],
-        isEdited: false,
-        replyCount: 0
-      };
+      if (!response.ok) {
+        throw new Error(`Failed to send message: ${response.statusText}`);
+      }
 
+      const newMessage = await response.json();
       addMessage(newMessage);
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -142,30 +153,17 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
 
   const handleThreadReply = async (content: string, parentId: string, threadId: string) => {
     try {
-      // Mock implementation
-      const newReply: Message = {
-        id: Math.random().toString(36).substr(2, 9),
-        content,
-        authorId: currentUserId || '1',
-        projectId,
-        parentId,
-        threadId,
-        mentions: [],
-        attachments: [],
-        reactions: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        author: {
-          id: currentUserId || '1',
-          name: 'Current User',
-          email: 'user@example.com'
-        },
-        replies: [],
-        mentionedUsers: [],
-        isEdited: false,
-        replyCount: 0
-      };
+      const response = await fetch(`/api/projects/${projectId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, parentId, threadId })
+      });
 
+      if (!response.ok) {
+        throw new Error(`Failed to send reply: ${response.statusText}`);
+      }
+
+      const newReply = await response.json();
       addMessage(newReply);
 
       // Update the current thread
@@ -182,8 +180,18 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
 
   const handleEditMessage = async (message: Message) => {
     try {
-      // In a real app, make API call
-      updateMessage(message.id, message);
+      const response = await fetch(`/api/messages/${message.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: message.content, mentions: message.mentions })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to edit message: ${response.statusText}`);
+      }
+
+      const updatedMessage = await response.json();
+      updateMessage(message.id, updatedMessage);
     } catch (error) {
       console.error('Failed to edit message:', error);
       throw error;
@@ -192,7 +200,14 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
 
   const handleDeleteMessage = async (message: Message) => {
     try {
-      // In a real app, make API call
+      const response = await fetch(`/api/messages/${message.id}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete message: ${response.statusText}`);
+      }
+
       removeMessage(message.id);
     } catch (error) {
       console.error('Failed to delete message:', error);
@@ -202,8 +217,22 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
 
   const handleReaction = async (messageId: string, emoji: string) => {
     try {
-      // In a real app, make API call to add/remove reaction
-      console.log('Add reaction:', messageId, emoji);
+      const response = await fetch(`/api/messages/${messageId}/reactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emoji })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to add reaction: ${response.statusText}`);
+      }
+
+      // Refresh the message to get updated reactions
+      const messageResponse = await fetch(`/api/messages/${messageId}`);
+      if (messageResponse.ok) {
+        const updatedMessage = await messageResponse.json();
+        updateMessage(messageId, updatedMessage);
+      }
     } catch (error) {
       console.error('Failed to add reaction:', error);
       throw error;

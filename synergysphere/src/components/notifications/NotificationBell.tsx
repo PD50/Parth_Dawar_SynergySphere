@@ -35,7 +35,9 @@ export function NotificationBell({
     markAsRead,
     markAllAsRead,
     setLoading,
-    setError
+    setError,
+    setNotifications,
+    setUnreadCount
   } = useNotificationStore();
 
   // Fetch notifications on mount and periodically
@@ -45,12 +47,15 @@ export function NotificationBell({
         setLoading(true);
         setError(null);
 
-        // In a real app, this would be an API call
-        // const response = await fetch('/api/notifications');
-        // const data = await response.json();
+        const response = await fetch('/api/notifications?limit=20');
         
-        // Mock implementation - notifications are already in the store
-        console.log('Fetching notifications...');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch notifications: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        setNotifications(data.notifications || []);
+        setUnreadCount(data.unreadCount || 0);
       } catch (err) {
         setError('Failed to fetch notifications');
         console.error('Failed to fetch notifications:', err);
@@ -64,7 +69,7 @@ export function NotificationBell({
     // Poll for new notifications every 30 seconds
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
-  }, [setLoading, setError]);
+  }, [setLoading, setError, setNotifications, setUnreadCount]);
 
   // Detect new notifications
   useEffect(() => {
@@ -80,12 +85,34 @@ export function NotificationBell({
     }
   }, [unreadCount]);
 
-  const handleNotificationClick = (notificationId: string) => {
-    markAsRead(notificationId);
+  const handleNotificationClick = async (notificationId: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${notificationId}/read`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isRead: true })
+      });
+
+      if (response.ok) {
+        markAsRead(notificationId);
+      }
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
   };
 
-  const handleMarkAllRead = () => {
-    markAllAsRead();
+  const handleMarkAllRead = async () => {
+    try {
+      const response = await fetch('/api/notifications/mark-all-read', {
+        method: 'PATCH'
+      });
+
+      if (response.ok) {
+        markAllAsRead();
+      }
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+    }
   };
 
   const handleOpenChange = (open: boolean) => {

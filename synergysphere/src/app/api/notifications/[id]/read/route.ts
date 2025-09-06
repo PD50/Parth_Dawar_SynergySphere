@@ -1,56 +1,186 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
-import { Notification } from '@/types/notifications';
+import { prisma } from '@/lib/prisma';
+import { NotificationType } from '@/types/notifications';
 
-// Mock database - replace with actual database implementation
-const mockNotifications: Notification[] = []; // This should be the same array as in the main notifications route
+async function markNotificationAsRead(notificationId: string, userId: string) {
+  const notification = await prisma.notification.findFirst({
+    where: {
+      id: notificationId,
+      userId, // Ensure the notification belongs to the requesting user
+    },
+    include: {
+      fromUser: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+      project: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
 
-async function markNotificationAsRead(notificationId: string, userId: string): Promise<Notification | null> {
-  const notificationIndex = mockNotifications.findIndex(notification => notification.id === notificationId);
-  if (notificationIndex === -1) return null;
-
-  const notification = mockNotifications[notificationIndex];
-  
-  // Verify that the notification belongs to the requesting user
-  if (notification.userId !== userId) {
-    throw new Error('Unauthorized: Cannot mark another user\'s notification as read');
+  if (!notification) {
+    return null;
   }
 
   // Mark as read if not already read
   if (!notification.isRead) {
-    notification.isRead = true;
-    notification.readAt = new Date();
-    mockNotifications[notificationIndex] = notification;
+    const updatedNotification = await prisma.notification.update({
+      where: { id: notificationId },
+      data: {
+        isRead: true,
+        readAt: new Date(),
+      },
+      include: {
+        fromUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+        project: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
 
-    // TODO: Emit real-time update to update unread count
-    // TODO: Update any cached unread counts
+    // Transform to match our interface
+    return {
+      id: updatedNotification.id,
+      type: updatedNotification.type as NotificationType,
+      title: updatedNotification.title,
+      message: updatedNotification.message,
+      data: updatedNotification.data,
+      userId: updatedNotification.userId,
+      fromUserId: updatedNotification.fromUserId,
+      projectId: updatedNotification.projectId,
+      isRead: updatedNotification.isRead,
+      readAt: updatedNotification.readAt,
+      createdAt: updatedNotification.createdAt,
+      fromUser: updatedNotification.fromUser,
+      project: updatedNotification.project ? {
+        id: updatedNotification.project.id,
+        name: updatedNotification.project.name,
+        color: undefined,
+      } : undefined,
+    };
   }
 
-  return notification;
+  // Already read, return as is
+  return {
+    id: notification.id,
+    type: notification.type as NotificationType,
+    title: notification.title,
+    message: notification.message,
+    data: notification.data,
+    userId: notification.userId,
+    fromUserId: notification.fromUserId,
+    projectId: notification.projectId,
+    isRead: notification.isRead,
+    readAt: notification.readAt,
+    createdAt: notification.createdAt,
+    fromUser: notification.fromUser,
+    project: notification.project ? {
+      id: notification.project.id,
+      name: notification.project.name,
+      color: undefined,
+    } : undefined,
+  };
 }
 
-async function markNotificationAsUnread(notificationId: string, userId: string): Promise<Notification | null> {
-  const notificationIndex = mockNotifications.findIndex(notification => notification.id === notificationId);
-  if (notificationIndex === -1) return null;
+async function markNotificationAsUnread(notificationId: string, userId: string) {
+  const notification = await prisma.notification.findFirst({
+    where: {
+      id: notificationId,
+      userId, // Ensure the notification belongs to the requesting user
+    },
+  });
 
-  const notification = mockNotifications[notificationIndex];
-  
-  // Verify that the notification belongs to the requesting user
-  if (notification.userId !== userId) {
-    throw new Error('Unauthorized: Cannot mark another user\'s notification as unread');
+  if (!notification) {
+    return null;
   }
 
   // Mark as unread if currently read
   if (notification.isRead) {
-    notification.isRead = false;
-    notification.readAt = undefined;
-    mockNotifications[notificationIndex] = notification;
+    const updatedNotification = await prisma.notification.update({
+      where: { id: notificationId },
+      data: {
+        isRead: false,
+        readAt: null,
+      },
+      include: {
+        fromUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+        project: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
 
-    // TODO: Emit real-time update to update unread count
-    // TODO: Update any cached unread counts
+    // Transform to match our interface
+    return {
+      id: updatedNotification.id,
+      type: updatedNotification.type as NotificationType,
+      title: updatedNotification.title,
+      message: updatedNotification.message,
+      data: updatedNotification.data,
+      userId: updatedNotification.userId,
+      fromUserId: updatedNotification.fromUserId,
+      projectId: updatedNotification.projectId,
+      isRead: updatedNotification.isRead,
+      readAt: updatedNotification.readAt,
+      createdAt: updatedNotification.createdAt,
+      fromUser: updatedNotification.fromUser,
+      project: updatedNotification.project ? {
+        id: updatedNotification.project.id,
+        name: updatedNotification.project.name,
+        color: undefined,
+      } : undefined,
+    };
   }
 
-  return notification;
+  // Already unread, return as is
+  return {
+    id: notification.id,
+    type: notification.type as NotificationType,
+    title: notification.title,
+    message: notification.message,
+    data: notification.data,
+    userId: notification.userId,
+    fromUserId: notification.fromUserId,
+    projectId: notification.projectId,
+    isRead: notification.isRead,
+    readAt: notification.readAt,
+    createdAt: notification.createdAt,
+    fromUser: notification.fromUser,
+    project: notification.project ? {
+      id: notification.project.id,
+      name: notification.project.name,
+      color: undefined,
+    } : undefined,
+  };
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -64,7 +194,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const notificationId = params.id;
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
 
     // Default to marking as read, but allow marking as unread
     const isRead = body.isRead !== undefined ? body.isRead : true;
@@ -78,7 +208,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     if (!updatedNotification) {
       return NextResponse.json(
-        { error: 'Notification not found' },
+        { error: 'Notification not found or access denied' },
         { status: 404 }
       );
     }
@@ -86,14 +216,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json(updatedNotification);
   } catch (error) {
     console.error('Failed to update notification:', error);
-    
-    if (error instanceof Error && error.message.includes('Unauthorized')) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 403 }
-      );
-    }
-
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

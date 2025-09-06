@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 interface JWTPayload {
   userId: string;
@@ -56,3 +56,45 @@ export class AuthService {
 
 // Create a singleton instance
 export const authService = new AuthService();
+
+// JWT-based authentication verification for API routes
+export async function verifyAuth(req: NextRequest): Promise<{
+  success: boolean;
+  userId?: string;
+  email?: string;
+  error?: string;
+}> {
+  try {
+    // Get token from cookie or Authorization header
+    const token = req.cookies.get('auth-token')?.value || 
+                  req.headers.get('authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return {
+        success: false,
+        error: 'No authentication token provided'
+      };
+    }
+
+    // Verify the JWT token
+    const payload = authService.verifyToken(token);
+    
+    return {
+      success: true,
+      userId: payload.userId,
+      email: payload.email
+    };
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      return {
+        success: false,
+        error: 'Invalid authentication token'
+      };
+    }
+    
+    return {
+      success: false,
+      error: 'Authentication failed'
+    };
+  }
+}

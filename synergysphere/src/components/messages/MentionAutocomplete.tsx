@@ -25,66 +25,40 @@ interface MentionAutocompleteProps {
   className?: string;
 }
 
-// Mock users data - replace with actual API call
-const mockUsers: User[] = [
-  {
-    id: "1",
-    name: "Alice Johnson",
-    email: "alice@synergysphere.com",
-    avatarUrl: "",
-    role: "Owner",
-    isOnline: true,
-  },
-  {
-    id: "2",
-    name: "Bob Smith",
-    email: "bob@synergysphere.com",
-    avatarUrl: "",
-    role: "Admin",
-    isOnline: true,
-  },
-  {
-    id: "3",
-    name: "Carol Davis",
-    email: "carol@synergysphere.com",
-    avatarUrl: "",
-    role: "Member",
-    isOnline: false,
-  },
-  {
-    id: "4",
-    name: "David Wilson",
-    email: "david@synergysphere.com",
-    avatarUrl: "",
-    role: "Member",
-    isOnline: true,
-  },
-  {
-    id: "5",
-    name: "Eve Martinez",
-    email: "eve@synergysphere.com",
-    avatarUrl: "",
-    role: "Member",
-    isOnline: false,
-  },
-];
 
 async function searchUsers(query: string, projectId?: string): Promise<User[]> {
-  // In a real app, this would make an API call
-  // const response = await fetch(`/api/projects/${projectId}/members/search?q=${query}`);
-  // return response.json();
-  
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 200)); // Simulate network delay
-  
-  if (!query.trim()) {
-    return mockUsers.slice(0, 5); // Return recent users
+  try {
+    const searchParams = new URLSearchParams();
+    if (query.trim()) {
+      searchParams.set('q', query.trim());
+    }
+    searchParams.set('limit', '10');
+    
+    const url = projectId 
+      ? `/api/projects/${projectId}/members/search?${searchParams}`
+      : `/api/users/search?${searchParams}`;
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`Search failed: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Transform the response to match our User interface
+    return (data.users || data.members || []).map((user: any) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      avatarUrl: user.avatarUrl,
+      role: user.role,
+      isOnline: user.isOnline || false
+    }));
+  } catch (error) {
+    console.error('Failed to search users:', error);
+    return [];
   }
-  
-  return mockUsers.filter(user =>
-    user.name.toLowerCase().includes(query.toLowerCase()) ||
-    user.email.toLowerCase().includes(query.toLowerCase())
-  );
 }
 
 export function MentionAutocomplete({

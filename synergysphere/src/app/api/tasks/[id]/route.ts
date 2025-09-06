@@ -1,9 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { z } from "zod";
-import { verifyAuth } from "@/lib/middleware/auth";
-
-const prisma = new PrismaClient();
+import { NextRequest, NextResponse } from 'next/server';
+import { verifyAuth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
 
 const updateTaskSchema = z.object({
   title: z.string().min(1, "Task title is required").optional(),
@@ -16,7 +14,7 @@ const updateTaskSchema = z.object({
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authResult = await verifyAuth(req);
@@ -24,13 +22,13 @@ export async function GET(
       return NextResponse.json({ error: authResult.error }, { status: 401 });
     }
 
-    const taskId = params.id;
+    const { id: taskId } = await params;
 
     const task = await prisma.task.findFirst({
       where: {
         id: taskId,
         project: {
-          members: {
+          memberships: {
             some: {
               userId: authResult.userId,
             },
@@ -65,7 +63,14 @@ export async function GET(
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ task });
+    // Transform task to ensure consistent status and priority values
+    const transformedTask = {
+      ...task,
+      status: task.status.toUpperCase() as 'TODO' | 'IN_PROGRESS' | 'DONE',
+      priority: task.priority.toUpperCase() as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT',
+    };
+
+    return NextResponse.json({ task: transformedTask });
   } catch (error) {
     console.error("Get task error:", error);
     return NextResponse.json(
@@ -77,7 +82,7 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authResult = await verifyAuth(req);
@@ -85,7 +90,7 @@ export async function PATCH(
       return NextResponse.json({ error: authResult.error }, { status: 401 });
     }
 
-    const taskId = params.id;
+    const { id: taskId } = await params;
     const body = await req.json();
     const validatedData = updateTaskSchema.parse(body);
 
@@ -94,7 +99,7 @@ export async function PATCH(
       where: {
         id: taskId,
         project: {
-          members: {
+          memberships: {
             some: {
               userId: authResult.userId,
             },
@@ -112,7 +117,7 @@ export async function PATCH(
 
     // If assigneeId is provided, verify they are a member of the project
     if (validatedData.assigneeId) {
-      const assigneeMember = await prisma.projectMember.findFirst({
+      const assigneeMember = await prisma.membership.findFirst({
         where: {
           projectId: existingTask.projectId,
           userId: validatedData.assigneeId,
@@ -159,7 +164,14 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json({ task });
+    // Transform task to ensure consistent status and priority values
+    const transformedTask = {
+      ...task,
+      status: task.status.toUpperCase() as 'TODO' | 'IN_PROGRESS' | 'DONE',
+      priority: task.priority.toUpperCase() as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT',
+    };
+
+    return NextResponse.json({ task: transformedTask });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -178,7 +190,7 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authResult = await verifyAuth(req);
@@ -186,14 +198,14 @@ export async function DELETE(
       return NextResponse.json({ error: authResult.error }, { status: 401 });
     }
 
-    const taskId = params.id;
+    const { id: taskId } = await params;
 
     // Check if user has access to this task
     const existingTask = await prisma.task.findFirst({
       where: {
         id: taskId,
         project: {
-          members: {
+          memberships: {
             some: {
               userId: authResult.userId,
             },

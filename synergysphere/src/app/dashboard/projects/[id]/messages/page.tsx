@@ -12,102 +12,7 @@ import { MessageSquare, Users, Clock, TrendingUp } from "lucide-react";
 import { useMessageStore } from "@/stores/messageStore";
 import { useSocket } from "@/hooks/useSocket";
 
-// Mock project data
-const mockProjectData = {
-  "1": {
-    name: "SynergySphere MVP",
-    description: "Building the core team collaboration platform",
-    memberCount: 5,
-    color: "#3b82f6"
-  },
-  "2": {
-    name: "Marketing Website", 
-    description: "Design and develop the marketing website",
-    memberCount: 3,
-    color: "#10b981"
-  }
-};
 
-// Mock messages data
-const mockMessages = [
-  {
-    id: '1',
-    content: 'Hey team! Just wanted to update everyone on the current sprint progress. We\'re making great progress on the authentication system and I think we\'ll be able to wrap up the user management features by end of week. @bob @carol what do you think about the current API structure?',
-    authorId: '1',
-    projectId: '1',
-    mentions: ['2', '3'],
-    attachments: [],
-    reactions: [
-      { id: '1', emoji: '👍', userId: '2', userName: 'Bob Smith', createdAt: new Date('2024-01-25T10:30:00Z') },
-      { id: '2', emoji: '🚀', userId: '3', userName: 'Carol Davis', createdAt: new Date('2024-01-25T10:35:00Z') }
-    ],
-    createdAt: new Date('2024-01-25T09:00:00Z'),
-    updatedAt: new Date('2024-01-25T09:00:00Z'),
-    author: {
-      id: '1',
-      name: 'Alice Johnson',
-      email: 'alice@synergysphere.com',
-      avatarUrl: ''
-    },
-    replies: [],
-    mentionedUsers: [
-      { id: '2', name: 'Bob Smith', email: 'bob@synergysphere.com' },
-      { id: '3', name: 'Carol Davis', email: 'carol@synergysphere.com' }
-    ],
-    isEdited: false,
-    replyCount: 2
-  },
-  {
-    id: '2',
-    content: 'Thanks for the update @alice! The login flow is working smoothly on my end. I think the API structure looks solid. Should we schedule a review session for the endpoints we\'ve built so far?',
-    authorId: '2',
-    projectId: '1',
-    parentId: '1',
-    threadId: '1',
-    mentions: ['1'],
-    attachments: [],
-    reactions: [],
-    createdAt: new Date('2024-01-25T09:15:00Z'),
-    updatedAt: new Date('2024-01-25T09:15:00Z'),
-    author: {
-      id: '2',
-      name: 'Bob Smith',
-      email: 'bob@synergysphere.com',
-      avatarUrl: ''
-    },
-    replies: [],
-    mentionedUsers: [
-      { id: '1', name: 'Alice Johnson', email: 'alice@synergysphere.com' }
-    ],
-    isEdited: false,
-    replyCount: 0
-  },
-  {
-    id: '3',
-    content: 'Agreed! The authentication system is looking great. I\'ve been working on the database schema and I think we should align on the user roles structure. Would tomorrow afternoon work for everyone?',
-    authorId: '3',
-    projectId: '1',
-    parentId: '1',
-    threadId: '1',
-    mentions: [],
-    attachments: [],
-    reactions: [
-      { id: '3', emoji: '✅', userId: '1', userName: 'Alice Johnson', createdAt: new Date('2024-01-25T09:25:00Z') }
-    ],
-    createdAt: new Date('2024-01-25T09:20:00Z'),
-    updatedAt: new Date('2024-01-25T09:20:00Z'),
-    author: {
-      id: '3',
-      name: 'Carol Davis',
-      email: 'carol@synergysphere.com',
-      avatarUrl: ''
-    },
-    replies: [],
-    mentionedUsers: [],
-    isEdited: false,
-    replyCount: 0
-  }
-];
 
 export default function ProjectMessagesPage() {
   const params = useParams();
@@ -116,7 +21,8 @@ export default function ProjectMessagesPage() {
   const [project, setProject] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentUserId] = useState('1'); // Mock current user
+  const [currentUserId] = useState('1'); // TODO: Get from auth context
+  const [messageStats, setMessageStats] = useState({ total: 0, replies: 0, today: 0 });
 
   const {
     setMessages,
@@ -157,19 +63,36 @@ export default function ProjectMessagesPage() {
         setIsLoading(true);
         setError(null);
 
-        // Simulate API call for project data
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const projectData = mockProjectData[projectId as keyof typeof mockProjectData];
-        if (!projectData) {
-          throw new Error("Project not found");
+        // Fetch project data
+        const projectResponse = await fetch(`/api/projects/${projectId}`);
+        if (!projectResponse.ok) {
+          throw new Error(`Failed to load project: ${projectResponse.statusText}`);
         }
-        
+        const projectData = await projectResponse.json();
         setProject(projectData);
 
-        // Load messages for this project
-        const projectMessages = mockMessages.filter(msg => msg.projectId === projectId);
-        setMessages(projectMessages);
+        // Fetch messages for this project
+        const messagesResponse = await fetch(`/api/projects/${projectId}/messages?limit=50`);
+        if (!messagesResponse.ok) {
+          throw new Error(`Failed to load messages: ${messagesResponse.statusText}`);
+        }
+        const messagesData = await messagesResponse.json();
+        setMessages(messagesData.messages || []);
+
+        // Calculate stats
+        const messages = messagesData.messages || [];
+        const rootMessages = messages.filter((m: any) => !m.parentId);
+        const replies = messages.filter((m: any) => m.parentId);
+        const today = new Date().toDateString();
+        const todayMessages = messages.filter((m: any) => 
+          new Date(m.createdAt).toDateString() === today
+        );
+
+        setMessageStats({
+          total: rootMessages.length,
+          replies: replies.length,
+          today: todayMessages.length
+        });
         
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to load project data";
@@ -240,10 +163,10 @@ export default function ProjectMessagesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {mockMessages.filter(m => m.projectId === projectId && !m.parentId).length}
+              {messageStats.total}
             </div>
             <p className="text-xs text-muted-foreground">
-              {mockMessages.filter(m => m.projectId === projectId && m.parentId).length} replies
+              {messageStats.replies} replies
             </p>
           </CardContent>
         </Card>
@@ -255,10 +178,7 @@ export default function ProjectMessagesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {mockMessages.filter(m => {
-                const today = new Date().toDateString();
-                return m.projectId === projectId && new Date(m.createdAt).toDateString() === today;
-              }).length}
+              {messageStats.today}
             </div>
             <p className="text-xs text-muted-foreground">
               messages today

@@ -222,8 +222,8 @@ export function TaskModal({
           <div className="space-y-2">
             <Label>Assignee</Label>
             <Select
-              value={watchedAssigneeId || ""}
-              onValueChange={(value) => setValue("assigneeId", value || undefined)}
+              value={watchedAssigneeId || "unassigned"}
+              onValueChange={(value) => setValue("assigneeId", value === "unassigned" ? undefined : value)}
             >
               <SelectTrigger>
                 <SelectValue>
@@ -246,7 +246,7 @@ export function TaskModal({
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">
+                <SelectItem value="unassigned">
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <User className="h-4 w-4" />
                     <span>Unassigned</span>

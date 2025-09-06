@@ -1,87 +1,272 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
-import { Message, MessageThread } from '@/types/messages';
+import { prisma } from '@/lib/prisma';
 
-// Mock database - replace with actual database implementation
-const mockMessages: Message[] = []; // This should be the same array as in other message routes
-
-const mockProjectMembers = [
-  { id: '1', name: 'Alice Johnson', email: 'alice@synergysphere.com', avatarUrl: '' },
-  { id: '2', name: 'Bob Smith', email: 'bob@synergysphere.com', avatarUrl: '' },
-  { id: '3', name: 'Carol Davis', email: 'carol@synergysphere.com', avatarUrl: '' },
-  { id: '4', name: 'David Wilson', email: 'david@synergysphere.com', avatarUrl: '' },
-];
-
-async function getMessageThread(rootMessageId: string): Promise<MessageThread | null> {
+async function getMessageThread(rootMessageId: string) {
   // Find the root message
-  const rootMessage = mockMessages.find(message => message.id === rootMessageId);
-  if (!rootMessage) return null;
+  const rootMessage = await prisma.message.findUnique({
+    where: { id: rootMessageId },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+      reactions: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+      _count: {
+        select: {
+          replies: true,
+        },
+      },
+    },
+  });
+
+  if (!rootMessage || rootMessage.deletedAt) {
+    return null;
+  }
 
   // If this message is actually a reply, find the real root
   const actualRootId = rootMessage.threadId || rootMessageId;
-  const actualRootMessage = mockMessages.find(message => message.id === actualRootId);
-  if (!actualRootMessage) return null;
+  
+  let actualRootMessage = rootMessage;
+  if (actualRootId !== rootMessageId) {
+    const fetchedRoot = await prisma.message.findUnique({
+      where: { id: actualRootId },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+        reactions: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            replies: true,
+          },
+        },
+      },
+    });
+    
+    if (fetchedRoot && !fetchedRoot.deletedAt) {
+      actualRootMessage = fetchedRoot;
+    }
+  }
 
   // Find all replies in this thread
-  const replies = mockMessages
-    .filter(message => 
-      message.threadId === actualRootId && 
-      message.id !== actualRootId &&
-      !message.deletedAt
-    )
-    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  const replies = await prisma.message.findMany({
+    where: {
+      threadId: actualRootId,
+      NOT: { id: actualRootId },
+      deletedAt: null,
+    },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+      reactions: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+      _count: {
+        select: {
+          replies: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+  });
 
   // Get unique participants in the thread
   const participantIds = new Set([
     actualRootMessage.authorId,
-    ...replies.map(reply => reply.authorId)
+    ...replies.map(reply => reply.authorId),
   ]);
 
-  const participants = Array.from(participantIds)
-    .map(id => mockProjectMembers.find(member => member.id === id)!)
-    .filter(Boolean);
+  const participants = await prisma.user.findMany({
+    where: {
+      id: { in: Array.from(participantIds) },
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      avatarUrl: true,
+    },
+  });
 
   const lastReplyAt = replies.length > 0 
     ? replies[replies.length - 1].createdAt 
     : actualRootMessage.createdAt;
 
-  const thread: MessageThread = {
+  // Transform messages to match our interface
+  const transformMessage = (message: any) => ({
+    id: message.id,
+    content: message.content,
+    authorId: message.authorId,
+    projectId: message.projectId,
+    parentId: message.parentId,
+    threadId: message.threadId,
+    mentions: message.mentions,
+    attachments: message.attachments,
+    reactions: message.reactions.map((reaction: any) => ({
+      id: reaction.id,
+      emoji: reaction.emoji,
+      userId: reaction.userId,
+      userName: reaction.user.name,
+      createdAt: reaction.createdAt,
+    })),
+    createdAt: message.createdAt,
+    updatedAt: message.updatedAt,
+    editedAt: message.editedAt,
+    deletedAt: message.deletedAt,
+    author: message.author,
+    replies: [],
+    mentionedUsers: [],
+    isEdited: message.isEdited,
+    replyCount: message._count.replies,
+  });
+
+  return {
     id: actualRootId,
-    rootMessage: actualRootMessage,
-    replies,
+    rootMessage: transformMessage(actualRootMessage),
+    replies: replies.map(transformMessage),
     totalReplies: replies.length,
     lastReplyAt: new Date(lastReplyAt),
-    participants
+    participants,
   };
-
-  return thread;
 }
 
 async function getThreadReplies(
   rootMessageId: string, 
   limit: number = 50, 
   cursor?: string
-): Promise<{ replies: Message[], hasMore: boolean, nextCursor?: string }> {
-  // Find all replies in this thread
-  let replies = mockMessages
-    .filter(message => 
-      message.threadId === rootMessageId && 
-      message.id !== rootMessageId &&
-      !message.deletedAt
-    )
-    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+) {
+  // Find the actual root message ID
+  const rootMessage = await prisma.message.findUnique({
+    where: { id: rootMessageId },
+    select: { threadId: true },
+  });
 
-  // Implement pagination
-  const startIndex = cursor ? replies.findIndex(r => r.id === cursor) + 1 : 0;
-  const endIndex = startIndex + limit;
-  const paginatedReplies = replies.slice(startIndex, endIndex);
+  if (!rootMessage) {
+    return { replies: [], hasMore: false, nextCursor: undefined };
+  }
+
+  const actualRootId = rootMessage.threadId || rootMessageId;
+
+  // Cursor-based pagination
+  const cursorCondition = cursor ? { id: cursor } : undefined;
+
+  const replies = await prisma.message.findMany({
+    where: {
+      threadId: actualRootId,
+      NOT: { id: actualRootId },
+      deletedAt: null,
+    },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+      reactions: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+      _count: {
+        select: {
+          replies: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+    take: limit + 1, // Take one extra to check if there are more
+    cursor: cursorCondition,
+    skip: cursor ? 1 : 0, // Skip the cursor item
+  });
+
+  const hasMore = replies.length > limit;
+  const items = hasMore ? replies.slice(0, limit) : replies;
+
+  // Transform to match our interface
+  const transformedReplies = items.map((message: any) => ({
+    id: message.id,
+    content: message.content,
+    authorId: message.authorId,
+    projectId: message.projectId,
+    parentId: message.parentId,
+    threadId: message.threadId,
+    mentions: message.mentions,
+    attachments: message.attachments,
+    reactions: message.reactions.map((reaction: any) => ({
+      id: reaction.id,
+      emoji: reaction.emoji,
+      userId: reaction.userId,
+      userName: reaction.user.name,
+      createdAt: reaction.createdAt,
+    })),
+    createdAt: message.createdAt,
+    updatedAt: message.updatedAt,
+    editedAt: message.editedAt,
+    deletedAt: message.deletedAt,
+    author: message.author,
+    replies: [],
+    mentionedUsers: [],
+    isEdited: message.isEdited,
+    replyCount: message._count.replies,
+  }));
 
   return {
-    replies: paginatedReplies,
-    hasMore: endIndex < replies.length,
-    nextCursor: paginatedReplies.length > 0 
-      ? paginatedReplies[paginatedReplies.length - 1].id 
-      : undefined
+    replies: transformedReplies,
+    hasMore,
+    nextCursor: hasMore ? items[items.length - 1].id : undefined,
   };
 }
 
@@ -103,6 +288,34 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const limit = parseInt(searchParams.get('limit') || '50');
     const cursor = searchParams.get('cursor') || undefined;
 
+    // First, verify the message exists and get its project ID
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      select: { projectId: true, deletedAt: true },
+    });
+
+    if (!message || message.deletedAt) {
+      return NextResponse.json(
+        { error: 'Message not found' },
+        { status: 404 }
+      );
+    }
+
+    // Verify user has access to the project this thread belongs to
+    const membership = await prisma.membership.findFirst({
+      where: {
+        projectId: message.projectId,
+        userId: authResult.userId,
+      },
+    });
+
+    if (!membership) {
+      return NextResponse.json(
+        { error: 'You do not have access to this thread' },
+        { status: 403 }
+      );
+    }
+
     if (includeRoot) {
       // Return full thread with root message and replies
       const thread = await getMessageThread(messageId);
@@ -114,24 +327,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         );
       }
 
-      // TODO: Verify user has access to the project this thread belongs to
-
       return NextResponse.json(thread);
     } else {
       // Return only replies with pagination
       const result = await getThreadReplies(messageId, limit, cursor);
-      
-      // Verify the root message exists
-      const rootMessage = mockMessages.find(message => message.id === messageId);
-      if (!rootMessage) {
-        return NextResponse.json(
-          { error: 'Root message not found' },
-          { status: 404 }
-        );
-      }
-
-      // TODO: Verify user has access to the project this thread belongs to
-
       return NextResponse.json(result);
     }
   } catch (error) {

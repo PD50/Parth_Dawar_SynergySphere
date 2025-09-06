@@ -54,11 +54,6 @@ const sidebarNavItems = [
     icon: BarChart3,
   },
   {
-    title: "Analytics",
-    href: "/dashboard/analytics",
-    icon: BarChart3,
-  },
-  {
     title: "Notifications",
     href: "/dashboard/notifications",
     icon: Bell,

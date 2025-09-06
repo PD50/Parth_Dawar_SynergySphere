@@ -89,7 +89,13 @@ interface TaskStore {
 const groupTasksByStatus = (tasks: Task[]) => {
   return tasks.reduce(
     (acc, task) => {
-      acc[task.status].push(task);
+      // Ensure the status exists in the accumulator
+      if (acc[task.status]) {
+        acc[task.status].push(task);
+      } else {
+        // Log warning for unexpected status values
+        console.warn(`Unexpected task status: ${task.status}`, task);
+      }
       return acc;
     },
     {

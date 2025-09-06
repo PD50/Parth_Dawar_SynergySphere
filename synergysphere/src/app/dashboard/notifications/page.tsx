@@ -17,143 +17,9 @@ import {
 import { useNotificationStore } from "@/stores/notificationStore";
 import { Notification, NotificationType } from "@/types/notifications";
 
-// Mock data for testing
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    type: 'mention',
-    title: 'You were mentioned',
-    message: 'Alice Johnson mentioned you in a message',
-    data: {
-      messageId: '1',
-      messageContent: 'Thanks for the update @bob! The login flow is working smoothly...',
-      threadId: '1',
-      url: '/dashboard/projects/1/messages?thread=1'
-    },
-    userId: '2',
-    fromUserId: '1',
-    projectId: '1',
-    isRead: false,
-    createdAt: new Date('2024-01-25T09:15:00Z'),
-    fromUser: {
-      id: '1',
-      name: 'Alice Johnson',
-      email: 'alice@synergysphere.com',
-      avatarUrl: ''
-    },
-    project: {
-      id: '1',
-      name: 'SynergySphere MVP',
-      color: '#3b82f6'
-    }
-  },
-  {
-    id: '2',
-    type: 'task_assigned',
-    title: 'Task assigned to you',
-    message: 'Alice Johnson assigned you to "Implement user authentication"',
-    data: {
-      taskId: '2',
-      taskTitle: 'Implement user authentication',
-      url: '/dashboard/projects/1/tasks?task=2'
-    },
-    userId: '2',
-    fromUserId: '1',
-    projectId: '1',
-    isRead: true,
-    createdAt: new Date('2024-01-24T14:30:00Z'),
-    readAt: new Date('2024-01-24T15:00:00Z'),
-    fromUser: {
-      id: '1',
-      name: 'Alice Johnson',
-      email: 'alice@synergysphere.com',
-      avatarUrl: ''
-    },
-    project: {
-      id: '1',
-      name: 'SynergySphere MVP',
-      color: '#3b82f6'
-    }
-  },
-  {
-    id: '3',
-    type: 'reply',
-    title: 'New reply to your message',
-    message: 'Bob Smith replied to your message in SynergySphere MVP',
-    data: {
-      messageId: '2',
-      messageContent: 'Thanks for the update @alice! Should we schedule a review session...',
-      threadId: '1',
-      url: '/dashboard/projects/1/messages?thread=1'
-    },
-    userId: '1',
-    fromUserId: '2',
-    projectId: '1',
-    isRead: false,
-    createdAt: new Date('2024-01-25T09:20:00Z'),
-    fromUser: {
-      id: '2',
-      name: 'Bob Smith',
-      email: 'bob@synergysphere.com',
-      avatarUrl: ''
-    },
-    project: {
-      id: '1',
-      name: 'SynergySphere MVP',
-      color: '#3b82f6'
-    }
-  },
-  {
-    id: '4',
-    type: 'deadline_reminder',
-    title: 'Task due soon',
-    message: 'Your task "Database Schema Design" is due in 2 days',
-    data: {
-      taskId: '3',
-      taskTitle: 'Database Schema Design',
-      url: '/dashboard/projects/1/tasks?task=3'
-    },
-    userId: '3',
-    projectId: '1',
-    isRead: false,
-    createdAt: new Date('2024-01-25T08:00:00Z'),
-    project: {
-      id: '1',
-      name: 'SynergySphere MVP',
-      color: '#3b82f6'
-    }
-  },
-  {
-    id: '5',
-    type: 'project_invite',
-    title: 'Project invitation',
-    message: 'You were invited to join "Marketing Website" project',
-    data: {
-      projectId: '2',
-      projectName: 'Marketing Website',
-      url: '/dashboard/projects/2'
-    },
-    userId: '1',
-    fromUserId: '1',
-    projectId: '2',
-    isRead: false,
-    createdAt: new Date('2024-01-24T16:00:00Z'),
-    fromUser: {
-      id: '1',
-      name: 'Alice Johnson',
-      email: 'alice@synergysphere.com',
-      avatarUrl: ''
-    },
-    project: {
-      id: '2',
-      name: 'Marketing Website',
-      color: '#10b981'
-    }
-  }
-];
 
 export default function NotificationsPage() {
-  const [currentUserId] = useState('1'); // Mock current user
+  const [currentUserId] = useState('1'); // TODO: Get from auth context
   const [selectedTab, setSelectedTab] = useState('all');
   
   const {
@@ -168,17 +34,53 @@ export default function NotificationsPage() {
     removeNotification,
     getNotificationsByType,
     getUnreadNotifications,
-    getNotificationStats
+    getNotificationStats,
+    setLoading,
+    setError,
+    setUnreadCount
   } = useNotificationStore();
 
-  // Load mock notifications on mount
+  // Load notifications from API
   useEffect(() => {
-    setNotifications(mockNotifications);
-  }, [setNotifications]);
+    const loadNotifications = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-  const handleNotificationClick = (notification: Notification) => {
+        const response = await fetch('/api/notifications?limit=100');
+        if (!response.ok) {
+          throw new Error(`Failed to load notifications: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        setNotifications(data.notifications || []);
+        setUnreadCount(data.unreadCount || 0);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load notifications';
+        setError(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadNotifications();
+  }, [setNotifications, setLoading, setError, setUnreadCount]);
+
+  const handleNotificationClick = async (notification: Notification) => {
     if (!notification.isRead) {
-      markAsRead(notification.id);
+      try {
+        const response = await fetch(`/api/notifications/${notification.id}/read`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isRead: true })
+        });
+
+        if (response.ok) {
+          markAsRead(notification.id);
+        }
+      } catch (error) {
+        console.error('Failed to mark notification as read:', error);
+      }
     }
     
     if (notification.data.url) {
@@ -186,20 +88,64 @@ export default function NotificationsPage() {
     }
   };
 
-  const handleMarkAsRead = (notificationId: string) => {
-    markAsRead(notificationId);
+  const handleMarkAsRead = async (notificationId: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${notificationId}/read`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isRead: true })
+      });
+
+      if (response.ok) {
+        markAsRead(notificationId);
+      }
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
   };
 
-  const handleMarkAsUnread = (notificationId: string) => {
-    markAsUnread(notificationId);
+  const handleMarkAsUnread = async (notificationId: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${notificationId}/read`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isRead: false })
+      });
+
+      if (response.ok) {
+        markAsUnread(notificationId);
+      }
+    } catch (error) {
+      console.error('Failed to mark notification as unread:', error);
+    }
   };
 
-  const handleDelete = (notificationId: string) => {
-    removeNotification(notificationId);
+  const handleDelete = async (notificationId: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${notificationId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        removeNotification(notificationId);
+      }
+    } catch (error) {
+      console.error('Failed to delete notification:', error);
+    }
   };
 
-  const handleMarkAllRead = () => {
-    markAllAsRead();
+  const handleMarkAllRead = async () => {
+    try {
+      const response = await fetch('/api/notifications/mark-all-read', {
+        method: 'PATCH'
+      });
+
+      if (response.ok) {
+        markAllAsRead();
+      }
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+    }
   };
 
   const getTabNotifications = () => {

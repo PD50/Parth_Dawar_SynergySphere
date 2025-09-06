@@ -13,121 +13,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Plus } from "lucide-react";
 import { Task, useTaskStore } from "@/stores/taskStore";
 
-// Mock data for development
-const mockTasks: Task[] = [
-  {
-    id: "1",
-    title: "Setup project structure",
-    description: "Create the basic folder structure and configuration files",
-    status: "DONE",
-    priority: "HIGH",
-    assigneeId: "1",
-    creatorId: "1",
-    projectId: "1",
-    dueDate: new Date("2024-02-01"),
-    createdAt: new Date("2024-01-15"),
-    updatedAt: new Date("2024-01-20"),
-    assignee: {
-      id: "1",
-      name: "Alice Johnson",
-      email: "alice@synergysphere.com",
-    },
-    creator: {
-      id: "1",
-      name: "Alice Johnson",
-      email: "alice@synergysphere.com",
-    },
-  },
-  {
-    id: "2",
-    title: "Implement user authentication",
-    description: "Add login and registration functionality with JWT tokens",
-    status: "IN_PROGRESS",
-    priority: "URGENT",
-    assigneeId: "2",
-    creatorId: "1",
-    projectId: "1",
-    dueDate: new Date("2024-02-05"),
-    createdAt: new Date("2024-01-18"),
-    updatedAt: new Date("2024-01-25"),
-    assignee: {
-      id: "2",
-      name: "Bob Smith",
-      email: "bob@synergysphere.com",
-    },
-    creator: {
-      id: "1",
-      name: "Alice Johnson",
-      email: "alice@synergysphere.com",
-    },
-  },
-  {
-    id: "3",
-    title: "Design database schema",
-    description: "Create comprehensive database design for all entities",
-    status: "TODO",
-    priority: "MEDIUM",
-    assigneeId: "3",
-    creatorId: "1",
-    projectId: "1",
-    dueDate: new Date("2024-02-10"),
-    createdAt: new Date("2024-01-20"),
-    updatedAt: new Date("2024-01-20"),
-    assignee: {
-      id: "3",
-      name: "Carol Davis",
-      email: "carol@synergysphere.com",
-    },
-    creator: {
-      id: "1",
-      name: "Alice Johnson",
-      email: "alice@synergysphere.com",
-    },
-  },
-  {
-    id: "4",
-    title: "Create API documentation",
-    description: "Document all API endpoints with examples",
-    status: "TODO",
-    priority: "LOW",
-    creatorId: "1",
-    projectId: "1",
-    createdAt: new Date("2024-01-22"),
-    updatedAt: new Date("2024-01-22"),
-    creator: {
-      id: "1",
-      name: "Alice Johnson",
-      email: "alice@synergysphere.com",
-    },
-  },
-];
-
-const mockProjectMembers = [
-  {
-    id: "1",
-    name: "Alice Johnson",
-    email: "alice@synergysphere.com",
-    avatarUrl: "",
-  },
-  {
-    id: "2",
-    name: "Bob Smith",
-    email: "bob@synergysphere.com",
-    avatarUrl: "",
-  },
-  {
-    id: "3",
-    name: "Carol Davis",
-    email: "carol@synergysphere.com",
-    avatarUrl: "",
-  },
-  {
-    id: "4",
-    name: "David Wilson",
-    email: "david@synergysphere.com",
-    avatarUrl: "",
-  },
-];
+interface ProjectMember {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  role: string;
+}
 
 export default function ProjectTasksPage() {
   const params = useParams();
@@ -154,6 +46,7 @@ export default function ProjectTasksPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [createModalDefaultStatus, setCreateModalDefaultStatus] = useState<Task["status"]>("TODO");
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
 
   // Filter tasks to only show current project's tasks
   const projectTasks = useMemo(() => {
@@ -162,6 +55,7 @@ export default function ProjectTasksPage() {
 
   useEffect(() => {
     loadTasks();
+    loadProjectMembers();
   }, [projectId]);
 
   const loadTasks = async () => {
@@ -169,20 +63,44 @@ export default function ProjectTasksPage() {
       setLoading(true);
       setError(null);
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch(`/api/projects/${projectId}/tasks`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch tasks: ${response.statusText}`);
+      }
       
-      // In a real app, you would fetch from API:
-      // const response = await fetch(`/api/projects/${projectId}/tasks`);
-      // const result = await response.json();
+      const result = await response.json();
       
-      setTasks(mockTasks);
+      // Transform tasks with proper date parsing
+      const transformedTasks = result.tasks.map((task: any) => ({
+        ...task,
+        dueDate: task.dueDate ? new Date(task.dueDate) : undefined,
+        createdAt: new Date(task.createdAt),
+        updatedAt: new Date(task.updatedAt),
+      }));
+      
+      setTasks(transformedTasks);
     } catch (err) {
+      console.error('Failed to load tasks:', err);
       const errorMessage = err instanceof Error ? err.message : "Failed to load tasks";
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadProjectMembers = async () => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/members`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch members: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      setProjectMembers(result.members || []);
+    } catch (err) {
+      console.error('Failed to load project members:', err);
+      // Don't show error for members - just continue with empty array
     }
   };
 
@@ -195,39 +113,38 @@ export default function ProjectTasksPage() {
     dueDate?: Date;
   }) => {
     try {
-      // In a real app, you would call the API:
-      // const response = await fetch(`/api/projects/${projectId}/tasks`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(taskData),
-      // });
-      // const newTask = await response.json();
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const newTask: Task = {
-        id: Math.random().toString(36).substr(2, 9),
+      // Handle "unassigned" value from UI
+      const payload = {
         ...taskData,
-        projectId,
-        creatorId: "1", // Current user
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        creator: {
-          id: "1",
-          name: "Alice Johnson",
-          email: "alice@synergysphere.com",
-        },
-        assignee: taskData.assigneeId 
-          ? mockProjectMembers.find(m => m.id === taskData.assigneeId) 
-          : undefined,
+        assigneeId: taskData.assigneeId === "unassigned" ? undefined : taskData.assigneeId,
+        dueDate: taskData.dueDate?.toISOString(),
+      };
+
+      const response = await fetch(`/api/projects/${projectId}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create task');
+      }
+
+      const newTaskData = await response.json();
+      const newTask: Task = {
+        ...newTaskData,
+        dueDate: newTaskData.dueDate ? new Date(newTaskData.dueDate) : undefined,
+        createdAt: new Date(newTaskData.createdAt),
+        updatedAt: new Date(newTaskData.updatedAt),
       };
 
       addTask(newTask);
       toast.success("Task created successfully");
       setIsCreateModalOpen(false);
     } catch (error) {
-      toast.error("Failed to create task");
+      const errorMessage = error instanceof Error ? error.message : "Failed to create task";
+      toast.error(errorMessage);
       throw error;
     }
   };
@@ -248,21 +165,29 @@ export default function ProjectTasksPage() {
     if (!editingTask) return;
 
     try {
-      // In a real app, you would call the API:
-      // const response = await fetch(`/api/tasks/${editingTask.id}`, {
-      //   method: 'PATCH',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(taskData),
-      // });
-
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const updatedTask: Partial<Task> = {
+      // Handle "unassigned" value from UI
+      const payload = {
         ...taskData,
-        updatedAt: new Date(),
-        assignee: taskData.assigneeId 
-          ? mockProjectMembers.find(m => m.id === taskData.assigneeId) 
-          : undefined,
+        assigneeId: taskData.assigneeId === "unassigned" ? undefined : taskData.assigneeId,
+        dueDate: taskData.dueDate?.toISOString(),
+      };
+
+      const response = await fetch(`/api/tasks/${editingTask.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update task');
+      }
+
+      const updatedTaskData = await response.json();
+      const updatedTask: Partial<Task> = {
+        ...updatedTaskData,
+        dueDate: updatedTaskData.dueDate ? new Date(updatedTaskData.dueDate) : undefined,
+        updatedAt: new Date(updatedTaskData.updatedAt),
       };
 
       updateTask(editingTask.id, updatedTask);
@@ -270,7 +195,8 @@ export default function ProjectTasksPage() {
       setIsEditModalOpen(false);
       setEditingTask(null);
     } catch (error) {
-      toast.error("Failed to update task");
+      const errorMessage = error instanceof Error ? error.message : "Failed to update task";
+      toast.error(errorMessage);
       throw error;
     }
   };
@@ -281,33 +207,41 @@ export default function ProjectTasksPage() {
     }
 
     try {
-      // In a real app, you would call the API:
-      // await fetch(`/api/tasks/${task.id}`, { method: 'DELETE' });
+      const response = await fetch(`/api/tasks/${task.id}`, { 
+        method: 'DELETE' 
+      });
 
-      await new Promise(resolve => setTimeout(resolve, 300));
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete task');
+      }
       
       removeTask(task.id);
       toast.success("Task deleted successfully");
     } catch (error) {
-      toast.error("Failed to delete task");
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete task";
+      toast.error(errorMessage);
     }
   };
 
   const handleMoveTask = async (taskId: string, newStatus: Task["status"]) => {
     try {
-      // In a real app, you would call the API:
-      // await fetch(`/api/tasks/${taskId}/status`, {
-      //   method: 'PATCH',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ status: newStatus }),
-      // });
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
 
-      await new Promise(resolve => setTimeout(resolve, 200));
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to move task');
+      }
       
       moveTask(taskId, newStatus);
       toast.success("Task moved successfully");
     } catch (error) {
-      toast.error("Failed to move task");
+      const errorMessage = error instanceof Error ? error.message : "Failed to move task";
+      toast.error(errorMessage);
     }
   };
 
@@ -354,7 +288,7 @@ export default function ProjectTasksPage() {
         filters={filters}
         onFiltersChange={setFilters}
         onClearFilters={clearFilters}
-        projectMembers={mockProjectMembers}
+        projectMembers={projectMembers}
       />
 
       {/* Kanban Board */}
@@ -372,7 +306,7 @@ export default function ProjectTasksPage() {
         onClose={() => setIsCreateModalOpen(false)}
         onCreateTask={handleCreateTask}
         defaultStatus={createModalDefaultStatus}
-        projectMembers={mockProjectMembers}
+        projectMembers={projectMembers}
       />
 
       {/* Edit Task Modal */}
@@ -385,7 +319,7 @@ export default function ProjectTasksPage() {
           }}
           onSubmit={handleUpdateTask}
           task={editingTask}
-          projectMembers={mockProjectMembers}
+          projectMembers={projectMembers}
         />
       )}
     </div>

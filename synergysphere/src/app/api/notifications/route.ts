@@ -1,203 +1,157 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/auth';
-import { Notification, NotificationFilters, CreateNotificationRequest, NotificationType } from '@/types/notifications';
-
-// Mock database - replace with actual database implementation
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    type: 'mention',
-    title: 'You were mentioned',
-    message: 'Alice Johnson mentioned you in a message',
-    data: {
-      messageId: '1',
-      messageContent: 'Thanks for the update @bob! The login flow is working smoothly...',
-      threadId: '1',
-      url: '/dashboard/projects/1/messages?thread=1'
-    },
-    userId: '2',
-    fromUserId: '1',
-    projectId: '1',
-    isRead: false,
-    createdAt: new Date('2024-01-25T09:15:00Z'),
-    fromUser: {
-      id: '1',
-      name: 'Alice Johnson',
-      email: 'alice@synergysphere.com',
-      avatarUrl: ''
-    },
-    project: {
-      id: '1',
-      name: 'SynergySphere MVP',
-      color: '#3b82f6'
-    }
-  },
-  {
-    id: '2',
-    type: 'task_assigned',
-    title: 'Task assigned to you',
-    message: 'Alice Johnson assigned you to "Implement user authentication"',
-    data: {
-      taskId: '2',
-      taskTitle: 'Implement user authentication',
-      url: '/dashboard/projects/1/tasks?task=2'
-    },
-    userId: '2',
-    fromUserId: '1',
-    projectId: '1',
-    isRead: true,
-    createdAt: new Date('2024-01-24T14:30:00Z'),
-    readAt: new Date('2024-01-24T15:00:00Z'),
-    fromUser: {
-      id: '1',
-      name: 'Alice Johnson',
-      email: 'alice@synergysphere.com',
-      avatarUrl: ''
-    },
-    project: {
-      id: '1',
-      name: 'SynergySphere MVP',
-      color: '#3b82f6'
-    }
-  },
-  {
-    id: '3',
-    type: 'reply',
-    title: 'New reply to your message',
-    message: 'Bob Smith replied to your message in SynergySphere MVP',
-    data: {
-      messageId: '2',
-      messageContent: 'Thanks for the update @alice! Should we schedule a review session...',
-      threadId: '1',
-      url: '/dashboard/projects/1/messages?thread=1'
-    },
-    userId: '1',
-    fromUserId: '2',
-    projectId: '1',
-    isRead: false,
-    createdAt: new Date('2024-01-25T09:20:00Z'),
-    fromUser: {
-      id: '2',
-      name: 'Bob Smith',
-      email: 'bob@synergysphere.com',
-      avatarUrl: ''
-    },
-    project: {
-      id: '1',
-      name: 'SynergySphere MVP',
-      color: '#3b82f6'
-    }
-  },
-  {
-    id: '4',
-    type: 'deadline_reminder',
-    title: 'Task due soon',
-    message: 'Your task "Database Schema Design" is due in 2 days',
-    data: {
-      taskId: '3',
-      taskTitle: 'Database Schema Design',
-      url: '/dashboard/projects/1/tasks?task=3'
-    },
-    userId: '3',
-    projectId: '1',
-    isRead: false,
-    createdAt: new Date('2024-01-25T08:00:00Z'),
-    project: {
-      id: '1',
-      name: 'SynergySphere MVP',
-      color: '#3b82f6'
-    }
-  }
-];
+import { prisma } from '@/lib/prisma';
+import { NotificationFilters, CreateNotificationRequest, NotificationType } from '@/types/notifications';
 
 async function getUserNotifications(
   userId: string,
   filters: NotificationFilters = {},
   limit: number = 50,
   cursor?: string
-): Promise<{ notifications: Notification[], hasMore: boolean, nextCursor?: string }> {
-  // Filter notifications for the user
-  let filteredNotifications = mockNotifications.filter(notification => notification.userId === userId);
+) {
+  const where: any = {
+    userId,
+  };
 
   // Apply filters
   if (filters.type) {
-    filteredNotifications = filteredNotifications.filter(notification => notification.type === filters.type);
+    where.type = filters.type;
   }
 
   if (filters.projectId) {
-    filteredNotifications = filteredNotifications.filter(notification => notification.projectId === filters.projectId);
+    where.projectId = filters.projectId;
   }
 
   if (filters.isRead !== undefined) {
-    filteredNotifications = filteredNotifications.filter(notification => notification.isRead === filters.isRead);
+    where.isRead = filters.isRead;
   }
 
   if (filters.fromDate) {
-    filteredNotifications = filteredNotifications.filter(notification =>
-      new Date(notification.createdAt) >= new Date(filters.fromDate!)
-    );
+    where.createdAt = {
+      ...where.createdAt,
+      gte: new Date(filters.fromDate),
+    };
   }
 
   if (filters.toDate) {
-    filteredNotifications = filteredNotifications.filter(notification =>
-      new Date(notification.createdAt) <= new Date(filters.toDate!)
-    );
+    where.createdAt = {
+      ...where.createdAt,
+      lte: new Date(filters.toDate),
+    };
   }
 
-  // Sort by creation date (newest first)
-  filteredNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  // Cursor-based pagination
+  const cursorCondition = cursor ? { id: cursor } : undefined;
 
-  // Implement pagination
-  const startIndex = cursor ? filteredNotifications.findIndex(n => n.id === cursor) + 1 : 0;
-  const endIndex = startIndex + limit;
-  const paginatedNotifications = filteredNotifications.slice(startIndex, endIndex);
+  const notifications = await prisma.notification.findMany({
+    where,
+    include: {
+      fromUser: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+      project: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: limit + 1, // Take one extra to check if there are more
+    cursor: cursorCondition,
+    skip: cursor ? 1 : 0, // Skip the cursor item
+  });
+
+  const hasMore = notifications.length > limit;
+  const items = hasMore ? notifications.slice(0, limit) : notifications;
+
+  // Transform to match our Notification interface
+  const transformedNotifications = items.map((notification: any) => ({
+    id: notification.id,
+    type: notification.type as NotificationType,
+    title: notification.title,
+    message: notification.message,
+    data: notification.data,
+    userId: notification.userId,
+    fromUserId: notification.fromUserId,
+    projectId: notification.projectId,
+    isRead: notification.isRead,
+    readAt: notification.readAt,
+    createdAt: notification.createdAt,
+    fromUser: notification.fromUser,
+    project: notification.project ? {
+      id: notification.project.id,
+      name: notification.project.name,
+      color: undefined, // Could be added to project model
+    } : undefined,
+  }));
 
   return {
-    notifications: paginatedNotifications,
-    hasMore: endIndex < filteredNotifications.length,
-    nextCursor: paginatedNotifications.length > 0 
-      ? paginatedNotifications[paginatedNotifications.length - 1].id 
-      : undefined
+    notifications: transformedNotifications,
+    hasMore,
+    nextCursor: hasMore ? items[items.length - 1].id : undefined,
   };
 }
 
-async function createNotification(request: CreateNotificationRequest): Promise<Notification[]> {
-  const notifications: Notification[] = [];
+async function createNotifications(request: CreateNotificationRequest) {
+  const notifications = [];
 
   for (const userId of request.userIds) {
-    const notification: Notification = {
-      id: Math.random().toString(36).substr(2, 9),
-      type: request.type,
-      title: request.title,
-      message: request.message,
-      data: request.data,
-      userId,
-      fromUserId: request.fromUserId,
-      projectId: request.projectId,
-      isRead: false,
-      createdAt: new Date()
-    };
+    const notification = await prisma.notification.create({
+      data: {
+        type: request.type,
+        title: request.title,
+        message: request.message,
+        data: request.data,
+        userId,
+        fromUserId: request.fromUserId,
+        projectId: request.projectId,
+      },
+      include: {
+        fromUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+        project: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
 
-    // Add populated fields if available
-    if (request.fromUserId) {
-      // In a real app, fetch user from database
-      notification.fromUser = {
-        id: request.fromUserId,
-        name: 'Unknown User',
-        email: 'unknown@example.com'
-      };
-    }
-
-    if (request.projectId) {
-      // In a real app, fetch project from database
-      notification.project = {
-        id: request.projectId,
-        name: 'Unknown Project'
-      };
-    }
-
-    mockNotifications.push(notification);
-    notifications.push(notification);
+    // Transform to match our interface
+    notifications.push({
+      id: notification.id,
+      type: notification.type as NotificationType,
+      title: notification.title,
+      message: notification.message,
+      data: notification.data,
+      userId: notification.userId,
+      fromUserId: notification.fromUserId,
+      projectId: notification.projectId,
+      isRead: notification.isRead,
+      readAt: notification.readAt,
+      createdAt: notification.createdAt,
+      fromUser: notification.fromUser,
+      project: notification.project ? {
+        id: notification.project.id,
+        name: notification.project.name,
+        color: undefined,
+      } : undefined,
+    });
   }
 
   // TODO: Send real-time updates to connected clients
@@ -206,10 +160,19 @@ async function createNotification(request: CreateNotificationRequest): Promise<N
   return notifications;
 }
 
-async function getUnreadCount(userId: string): Promise<number> {
-  return mockNotifications.filter(notification => 
-    notification.userId === userId && !notification.isRead
-  ).length;
+async function getUnreadCount(userId: string, projectId?: string): Promise<number> {
+  const where: any = {
+    userId,
+    isRead: false,
+  };
+
+  if (projectId) {
+    where.projectId = projectId;
+  }
+
+  return await prisma.notification.count({
+    where,
+  });
 }
 
 export async function GET(req: NextRequest) {
@@ -226,7 +189,8 @@ export async function GET(req: NextRequest) {
     
     // Check if this is a request for unread count only
     if (searchParams.get('countOnly') === 'true') {
-      const unreadCount = await getUnreadCount(authResult.userId);
+      const projectId = searchParams.get('projectId') || undefined;
+      const unreadCount = await getUnreadCount(authResult.userId, projectId);
       return NextResponse.json({ unreadCount });
     }
     
@@ -247,7 +211,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       ...result,
-      unreadCount
+      unreadCount,
     });
   } catch (error) {
     console.error('Failed to fetch notifications:', error);
@@ -292,9 +256,39 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // TODO: Verify user has permission to send notifications in the specified project
+    // Validate that all user IDs exist
+    const users = await prisma.user.findMany({
+      where: {
+        id: { in: body.userIds },
+      },
+      select: { id: true },
+    });
 
-    const notifications = await createNotification(body);
+    if (users.length !== body.userIds.length) {
+      return NextResponse.json(
+        { error: 'One or more user IDs are invalid' },
+        { status: 400 }
+      );
+    }
+
+    // If projectId is specified, verify user has permission to send notifications in that project
+    if (body.projectId) {
+      const membership = await prisma.membership.findFirst({
+        where: {
+          projectId: body.projectId,
+          userId: authResult.userId,
+        },
+      });
+
+      if (!membership) {
+        return NextResponse.json(
+          { error: 'You do not have access to this project' },
+          { status: 403 }
+        );
+      }
+    }
+
+    const notifications = await createNotifications(body);
 
     return NextResponse.json(notifications, { status: 201 });
   } catch (error) {

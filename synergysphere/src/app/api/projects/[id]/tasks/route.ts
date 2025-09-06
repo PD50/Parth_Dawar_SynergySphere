@@ -1,22 +1,20 @@
-import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { z } from "zod";
-import { verifyAuth } from "@/lib/middleware/auth";
-
-const prisma = new PrismaClient();
+import { NextRequest, NextResponse } from 'next/server';
+import { verifyAuth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
 
 const createTaskSchema = z.object({
-  title: z.string().min(1, "Task title is required"),
+  title: z.string().min(1, 'Task title is required').max(200, 'Task title too long'),
   description: z.string().optional(),
   assigneeId: z.string().optional(),
-  status: z.enum(["TODO", "IN_PROGRESS", "DONE"]).default("TODO"),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
-  dueDate: z.string().optional(),
+  status: z.enum(['TODO', 'IN_PROGRESS', 'DONE']).default('TODO'),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
+  dueDate: z.string().datetime().optional().transform(val => val ? new Date(val) : undefined),
 });
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authResult = await verifyAuth(req);
@@ -24,7 +22,7 @@ export async function GET(
       return NextResponse.json({ error: authResult.error }, { status: 401 });
     }
 
-    const projectId = params.id;
+    const { id: projectId } = await params;
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const assigneeId = searchParams.get("assigneeId");
@@ -33,7 +31,7 @@ export async function GET(
     const project = await prisma.project.findFirst({
       where: {
         id: projectId,
-        members: {
+        memberships: {
           some: {
             userId: authResult.userId,
           },
@@ -82,7 +80,14 @@ export async function GET(
       ],
     });
 
-    return NextResponse.json({ tasks });
+    // Transform tasks to ensure consistent status and priority values
+    const transformedTasks = tasks.map(task => ({
+      ...task,
+      status: task.status.toUpperCase() as 'TODO' | 'IN_PROGRESS' | 'DONE',
+      priority: task.priority.toUpperCase() as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT',
+    }));
+
+    return NextResponse.json({ tasks: transformedTasks });
   } catch (error) {
     console.error("Get tasks error:", error);
     return NextResponse.json(
@@ -94,7 +99,7 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const authResult = await verifyAuth(req);
@@ -102,7 +107,7 @@ export async function POST(
       return NextResponse.json({ error: authResult.error }, { status: 401 });
     }
 
-    const projectId = params.id;
+    const { id: projectId } = await params;
     const body = await req.json();
     const validatedData = createTaskSchema.parse(body);
 
@@ -110,7 +115,7 @@ export async function POST(
     const project = await prisma.project.findFirst({
       where: {
         id: projectId,
-        members: {
+        memberships: {
           some: {
             userId: authResult.userId,
           },
@@ -124,7 +129,7 @@ export async function POST(
 
     // If assigneeId is provided, verify they are a member of the project
     if (validatedData.assigneeId) {
-      const assigneeMember = await prisma.projectMember.findFirst({
+      const assigneeMember = await prisma.membership.findFirst({
         where: {
           projectId,
           userId: validatedData.assigneeId,
@@ -141,8 +146,12 @@ export async function POST(
 
     const task = await prisma.task.create({
       data: {
-        ...validatedData,
-        dueDate: validatedData.dueDate ? new Date(validatedData.dueDate) : null,
+        title: validatedData.title,
+        description: validatedData.description,
+        status: validatedData.status,
+        priority: validatedData.priority,
+        assigneeId: validatedData.assigneeId,
+        dueDate: validatedData.dueDate,
         projectId,
         creatorId: authResult.userId,
       },
@@ -164,7 +173,14 @@ export async function POST(
       },
     });
 
-    return NextResponse.json({ task }, { status: 201 });
+    // Transform task to ensure consistent status and priority values
+    const transformedTask = {
+      ...task,
+      status: task.status.toUpperCase() as 'TODO' | 'IN_PROGRESS' | 'DONE',
+      priority: task.priority.toUpperCase() as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT',
+    };
+
+    return NextResponse.json({ task: transformedTask }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
