@@ -26,6 +26,7 @@ export function NotificationBell({
 }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [hasNewNotifications, setHasNewNotifications] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
 
   const {
     unreadCount,
@@ -43,7 +44,15 @@ export function NotificationBell({
   // Fetch notifications on mount and periodically
   useEffect(() => {
     const fetchNotifications = async (silent = false) => {
+      // Prevent duplicate concurrent requests
+      if (isFetching) {
+        console.log('Skipping notification fetch - already in progress');
+        return;
+      }
+      
       try {
+        setIsFetching(true);
+        console.log(`Fetching notifications - silent: ${silent}`);
         if (!silent) {
           setLoading(true);
           setError(null);
@@ -68,6 +77,7 @@ export function NotificationBell({
           console.error('Failed to fetch notifications:', err);
         }
       } finally {
+        setIsFetching(false);
         if (!silent) {
           setLoading(false);
         }
@@ -76,10 +86,40 @@ export function NotificationBell({
 
     fetchNotifications();
 
-    // Poll for new notifications every 0.5 seconds for instant updates
-    const interval = setInterval(() => fetchNotifications(true), 500);
-    return () => clearInterval(interval);
-  }, [setLoading, setError, setNotifications, setUnreadCount, notifications, unreadCount]);
+    // Smart polling with visibility detection
+    let interval: NodeJS.Timeout;
+    
+    const startPolling = () => {
+      if (interval) clearInterval(interval);
+      console.log('Starting notification polling - every 30 seconds');
+      // Poll every 30 seconds when page is visible
+      interval = setInterval(() => {
+        if (!document.hidden && document.hasFocus()) {
+          console.log('Polling notifications (30s interval)');
+          fetchNotifications(true);
+        } else {
+          console.log('Skipping notification poll - page not visible or focused');
+        }
+      }, 30000);
+    };
+    
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (interval) clearInterval(interval);
+      } else {
+        startPolling();
+        fetchNotifications(true);
+      }
+    };
+    
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      if (interval) clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [setLoading, setError, setNotifications, setUnreadCount]);
 
   // Detect new notifications
   useEffect(() => {

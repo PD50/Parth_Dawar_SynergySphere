@@ -6,13 +6,19 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Calendar, Clock, MoreVertical, User, AlertCircle } from "lucide-react";
+import { Calendar, Clock, MoreVertical, User, AlertCircle, Tag } from "lucide-react";
 import { Task } from "@/stores/taskStore";
 import { cn } from "@/lib/utils";
 import { format, isAfter, isBefore, subDays } from "date-fns";
 
 interface TaskCardProps {
-  task: Task;
+  task: Task & {
+    tags?: {
+      category: string;
+      type: string;
+      color?: string;
+    }[];
+  };
   onEdit?: (task: Task) => void;
   onDelete?: (task: Task) => void;
   onAssign?: (task: Task) => void;
@@ -67,13 +73,41 @@ export const TaskCard = React.forwardRef<HTMLDivElement, TaskCardProps>(({
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <h3 className="font-medium text-sm line-clamp-2 mb-1">
-              {task.title}
-            </h3>
+            <div className="flex items-start justify-between mb-1">
+              <h3 className="font-medium text-sm line-clamp-2 flex-1">
+                {task.title}
+              </h3>
+              {/* Prominent Assignee Avatar */}
+              {task.assignee && (
+                <Avatar className="h-7 w-7 ml-2 flex-shrink-0">
+                  <AvatarImage src={(task.assignee as any).avatarUrl} alt={task.assignee.name} />
+                  <AvatarFallback className="text-xs">
+                    {task.assignee.name.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+            </div>
             {task.description && (
-              <p className="text-xs text-muted-foreground line-clamp-2">
+              <p className="text-xs text-muted-foreground line-clamp-2 mb-1">
                 {task.description}
               </p>
+            )}
+            
+            {/* Enhanced Tags */}
+            {task.tags && task.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-1">
+                {task.tags.map((tag, index) => (
+                  <Badge 
+                    key={index}
+                    variant="outline" 
+                    className="text-xs py-0 px-1"
+                    style={{ borderColor: tag.color, color: tag.color }}
+                  >
+                    <Tag className="h-2 w-2 mr-1" />
+                    {tag.category}/{tag.type}
+                  </Badge>
+                ))}
+              </div>
             )}
           </div>
           <DropdownMenu>
@@ -108,16 +142,16 @@ export const TaskCard = React.forwardRef<HTMLDivElement, TaskCardProps>(({
       
       <CardContent className="pt-0">
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 flex-wrap">
             <Badge 
               variant="secondary" 
-              className={cn("text-xs", priorityInfo.className)}
+              className={cn("text-xs py-0 px-2", priorityInfo.className)}
             >
               {priorityInfo.label}
             </Badge>
             <Badge 
               variant="outline" 
-              className={cn("text-xs", statusInfo.className)}
+              className={cn("text-xs py-0 px-2", statusInfo.className)}
             >
               {statusInfo.label}
             </Badge>
@@ -136,11 +170,12 @@ export const TaskCard = React.forwardRef<HTMLDivElement, TaskCardProps>(({
         </div>
 
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
             {task.dueDate && (
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
                 <span className={cn(
+                  "truncate",
                   isOverdue && "text-red-600 font-medium"
                 )}>
                   {format(new Date(task.dueDate), "MMM d")}
@@ -150,30 +185,22 @@ export const TaskCard = React.forwardRef<HTMLDivElement, TaskCardProps>(({
             
             <div className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              <span>{format(new Date(task.createdAt), "MMM d")}</span>
+              <span className="truncate">{format(new Date(task.createdAt), "MMM d")}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {task.assignee ? (
-              <div className="flex items-center gap-1">
-                <Avatar className="h-4 w-4">
-                  <AvatarImage src={task.assignee.avatarUrl} alt={task.assignee.name} />
-                  <AvatarFallback className="text-xs">
-                    {task.assignee.name.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="text-xs truncate max-w-16">
-                  {task.assignee.name.split(' ')[0]}
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <User className="h-3 w-3" />
-                <span className="text-xs">Unassigned</span>
-              </div>
-            )}
-          </div>
+          {!task.assignee && (
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <User className="h-3 w-3" />
+              <span className="text-xs">Unassigned</span>
+            </div>
+          )}
+          
+          {task.assignee && (
+            <div className="text-xs truncate max-w-20">
+              {task.assignee.name.split(' ')[0]}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

@@ -13,10 +13,12 @@ import {
   Edit, 
   Trash2, 
   Users, 
-  Calendar,
   FolderOpen,
-  Archive
+  Archive,
+  CheckSquare,
+  Tag
 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -32,6 +34,17 @@ interface Project {
   taskCount: number;
   createdAt: string;
   updatedAt: string;
+  manager?: {
+    id: string;
+    name: string;
+    email: string;
+    avatarUrl?: string;
+  };
+  tags?: {
+    category: string;
+    type: string;
+    color?: string;
+  }[];
 }
 
 interface ProjectListProps {
@@ -109,25 +122,56 @@ export function ProjectList({ projects, onProjectUpdate }: ProjectListProps) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {projects.map((project) => (
           <Card key={project.id} className="hover:shadow-lg transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-1">
+                  <div className="flex items-center space-x-2 mb-2">
                     <div
-                      className="w-3 h-3 rounded-full"
+                      className="w-3 h-3 rounded-full flex-shrink-0"
                       style={{ backgroundColor: project.color || "#3b82f6" }}
                     />
-                    <CardTitle className="text-lg">{project.name}</CardTitle>
+                    <CardTitle className="text-base sm:text-lg truncate">{project.name}</CardTitle>
                   </div>
-                  <Badge 
-                    variant="secondary" 
-                    className={statusConfig[project.status].className}
-                  >
-                    {statusConfig[project.status].label}
-                  </Badge>
+                  
+                  {/* Manager Avatar */}
+                  {project.manager && (
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={project.manager.avatarUrl} alt={project.manager.name} />
+                        <AvatarFallback className="text-xs">
+                          {project.manager.name.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-xs text-muted-foreground truncate">
+                        Manager: {project.manager.name}
+                      </span>
+                    </div>
+                  )}
+                  
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    <Badge 
+                      variant="secondary" 
+                      className={`${statusConfig[project.status].className} text-xs`}
+                    >
+                      {statusConfig[project.status].label}
+                    </Badge>
+                    
+                    {/* Project Tags */}
+                    {project.tags && project.tags.map((tag, index) => (
+                      <Badge 
+                        key={index}
+                        variant="outline" 
+                        className="text-xs"
+                        style={{ borderColor: tag.color, color: tag.color }}
+                      >
+                        <Tag className="h-2 w-2 mr-1" />
+                        {tag.category}/{tag.type}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
                 
                 <DropdownMenu>
@@ -159,27 +203,25 @@ export function ProjectList({ projects, onProjectUpdate }: ProjectListProps) {
               </div>
             </CardHeader>
             
-            <CardContent className="space-y-4">
-              <CardDescription className="line-clamp-2">
+            <CardContent className="space-y-3 sm:space-y-4">
+              <CardDescription className="line-clamp-2 text-sm">
                 {project.description || "No description provided"}
               </CardDescription>
               
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center">
-                    <Users className="mr-1 h-4 w-4" />
-                    {project.memberCount}
-                  </div>
-                  <div className="flex items-center">
-                    <Calendar className="mr-1 h-4 w-4" />
-                    {project.taskCount} tasks
-                  </div>
+              <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm text-muted-foreground">
+                <div className="flex items-center">
+                  <Users className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="truncate">{project.memberCount} members</span>
+                </div>
+                <div className="flex items-center">
+                  <CheckSquare className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="truncate">{project.taskCount} tasks</span>
                 </div>
               </div>
               
               <div className="pt-2">
                 <Link href={`/dashboard/projects/${project.id}`}>
-                  <Button variant="outline" size="sm" className="w-full">
+                  <Button variant="outline" size="sm" className="w-full text-xs sm:text-sm">
                     View Project
                   </Button>
                 </Link>

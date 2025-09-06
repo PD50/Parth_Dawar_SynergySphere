@@ -12,6 +12,7 @@ import { PageLoader } from "@/components/ui/page-loader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Plus } from "lucide-react";
 import { Task, useTaskStore } from "@/stores/taskStore";
+import { Breadcrumb, useBreadcrumbs } from "@/components/ui/breadcrumb";
 
 interface ProjectMember {
   id: string;
@@ -24,6 +25,7 @@ interface ProjectMember {
 export default function ProjectTasksPage() {
   const params = useParams();
   const projectId = params.id as string;
+  const { generateProjectBreadcrumbs } = useBreadcrumbs();
 
   const {
     tasks,
@@ -47,6 +49,7 @@ export default function ProjectTasksPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [createModalDefaultStatus, setCreateModalDefaultStatus] = useState<Task["status"]>("TODO");
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
+  const [projectName, setProjectName] = useState<string>("Project");
 
   // Filter tasks to only show current project's tasks
   const projectTasks = useMemo(() => {
@@ -56,6 +59,7 @@ export default function ProjectTasksPage() {
   useEffect(() => {
     loadTasks();
     loadProjectMembers();
+    loadProjectInfo();
   }, [projectId]);
 
   const loadTasks = async () => {
@@ -101,6 +105,21 @@ export default function ProjectTasksPage() {
     } catch (err) {
       console.error('Failed to load project members:', err);
       // Don't show error for members - just continue with empty array
+    }
+  };
+
+  const loadProjectInfo = async () => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch project: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      setProjectName(result.name || "Project");
+    } catch (err) {
+      console.error('Failed to load project info:', err);
+      // Don't show error for project name - just continue with default
     }
   };
 
@@ -267,18 +286,27 @@ export default function ProjectTasksPage() {
     );
   }
 
+  // Generate breadcrumbs
+  const breadcrumbItems = generateProjectBreadcrumbs(
+    projectId,
+    projectName,
+    "tasks"
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
+      <Breadcrumb items={breadcrumbItems} />
+      
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Tasks</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Tasks</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
             Manage and track project tasks
           </p>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
+        <Button onClick={() => setIsCreateModalOpen(true)} className="text-sm sm:text-base px-3 sm:px-4">
+          <Plus className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
           Add Task
         </Button>
       </div>

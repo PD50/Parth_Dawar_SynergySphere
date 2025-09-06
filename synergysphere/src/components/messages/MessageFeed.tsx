@@ -39,6 +39,7 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isComposerFocused, setIsComposerFocused] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -82,9 +83,15 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
     );
   }, [getTypingUsers, projectId, currentUserId]);
 
-  // Load messages for the project
+  // Load messages for the project with debouncing to prevent duplicate calls
   const loadMessages = async (silent = false) => {
+    // Prevent multiple concurrent API calls
+    if (isLoadingMessages) {
+      return;
+    }
+    
     try {
+      setIsLoadingMessages(true);
       if (!silent) {
         setLoading(true);
       }
@@ -105,6 +112,7 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
         setError(error instanceof Error ? error.message : 'Failed to load messages');
       }
     } finally {
+      setIsLoadingMessages(false);
       if (!silent) {
         setLoading(false);
       }
@@ -118,18 +126,49 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
     }
   }, [projectId]);
 
-  // Auto-polling for real-time message updates
+  // Smart polling - only poll when page is visible and user not typing
   useEffect(() => {
     if (!projectId) return;
-
-    const pollInterval = setInterval(() => {
-      // Only poll if user is not currently typing to avoid interrupting
-      if (!isComposerFocused) {
-        loadMessages(true); // Silent polling to avoid loading states
+    
+    let pollInterval: NodeJS.Timeout;
+    
+    const startPolling = () => {
+      // Clear any existing interval
+      if (pollInterval) clearInterval(pollInterval);
+      
+      pollInterval = setInterval(() => {
+        // Only poll if:
+        // 1. Page is visible (user is actively viewing)
+        // 2. User is not typing
+        // 3. Document is focused
+        if (!document.hidden && !isComposerFocused && document.hasFocus()) {
+          loadMessages(true); // Silent polling
+        }
+      }, 8000); // Reduced to 8 seconds for better performance
+    };
+    
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Page is hidden, stop polling
+        if (pollInterval) clearInterval(pollInterval);
+      } else {
+        // Page is visible, resume polling
+        startPolling();
+        // Immediately fetch when page becomes visible
+        loadMessages(true);
       }
-    }, 500); // Poll every 0.5 seconds for near-instant updates
-
-    return () => clearInterval(pollInterval);
+    };
+    
+    // Start initial polling
+    startPolling();
+    
+    // Listen for visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [projectId, isComposerFocused]);
 
   // Handle scroll to detect when user is at bottom
@@ -277,33 +316,33 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
       {/* Main message feed */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 border-b gap-3 sm:gap-0">
           <div className="flex items-center space-x-2">
-            <Hash className="h-5 w-5 text-muted-foreground" />
-            <h2 className="font-semibold">Project Discussion</h2>
-            <Badge variant="secondary" className="ml-2">
+            <Hash className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+            <h2 className="text-sm sm:text-base font-semibold">Project Discussion</h2>
+            <Badge variant="secondary" className="ml-2 text-xs">
               {rootMessages.length} messages
             </Badge>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 w-full sm:w-auto">
             {/* Search */}
-            <div className="relative">
+            <div className="relative flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search messages..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-64"
+                className="pl-10 w-full sm:w-64 text-sm sm:text-base"
               />
             </div>
 
             {/* Filters */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Filter className="h-4 w-4 mr-1" />
-                  Filter
+                <Button variant="outline" size="sm" className="px-2 sm:px-3">
+                  <Filter className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Filter</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
@@ -401,7 +440,7 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
 
         {/* Message composer */}
         <div className={cn(
-          "p-4 border-t bg-background",
+          "p-2 sm:p-4 border-t bg-background",
           isComposerFocused && "border-primary"
         )}>
           <MessageComposer
@@ -412,6 +451,7 @@ export function MessageFeed({ projectId, currentUserId, className }: MessageFeed
               // Handle typing indicator
               console.log('Typing:', isTyping);
             }}
+            compact={typeof window !== 'undefined' && window.innerWidth < 640}
           />
         </div>
       </div>

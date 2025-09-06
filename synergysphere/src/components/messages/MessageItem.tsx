@@ -110,17 +110,17 @@ export function MessageItem({
 
   return (
     <div className={cn(
-      "flex w-full mb-4 px-4 group",
+      "flex w-full mb-3 px-2 sm:px-4 group",
       isAuthor ? "justify-end" : "justify-start",
-      isReply && "ml-12",
+      isReply && "ml-6 sm:ml-12",
       className
     )}>
       <div className={cn(
-        "flex max-w-[75%] min-w-[200px]",
+        "flex max-w-[85%] sm:max-w-[75%] md:max-w-[65%] min-w-[120px] sm:min-w-[200px]",
         isAuthor ? "flex-row-reverse" : "flex-row"
       )}>
         {/* Avatar */}
-        <Avatar className="h-8 w-8 flex-shrink-0">
+        <Avatar className="h-6 w-6 sm:h-8 sm:w-8 flex-shrink-0">
           <AvatarImage src={message.author.avatarUrl} alt={message.author.name} />
           <AvatarFallback className="text-xs">
             {message.author.name.charAt(0).toUpperCase()}
@@ -130,21 +130,21 @@ export function MessageItem({
         {/* Message Content */}
         <div className={cn(
           "flex flex-col",
-          isAuthor ? "mr-3 items-end" : "ml-3 items-start"
+          isAuthor ? "mr-2 sm:mr-3 items-end" : "ml-2 sm:ml-3 items-start"
         )}>
           {/* Author and Time */}
           <div className={cn(
-            "flex items-center gap-2 mb-1",
+            "flex items-center gap-1 sm:gap-2 mb-1 max-w-full",
             isAuthor ? "flex-row-reverse" : "flex-row"
           )}>
-            <span className="text-sm font-medium text-muted-foreground">
+            <span className="text-xs sm:text-sm font-medium text-muted-foreground truncate">
               {message.author.name}
             </span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
               {formatDistanceToNow(new Date(message.createdAt), { addSuffix: true })}
             </span>
             {message.isEdited && (
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-xs hidden sm:inline-flex">
                 edited
               </Badge>
             )}
@@ -152,20 +152,20 @@ export function MessageItem({
 
           {/* Message Bubble */}
           <div className={cn(
-            "relative rounded-2xl px-4 py-3 max-w-full break-words",
+            "relative rounded-2xl px-3 py-2 sm:px-4 sm:py-3 max-w-full break-words text-sm sm:text-base",
             isAuthor 
               ? "bg-primary text-primary-foreground rounded-br-md" 
               : "bg-muted text-muted-foreground rounded-bl-md",
             "shadow-sm"
           )}>
-            {/* Message Actions Button */}
+            {/* Message Actions Button - Hidden on small screens */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   className={cn(
-                    "absolute -top-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity",
+                    "absolute -top-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hidden sm:inline-flex",
                     isAuthor ? "-left-2" : "-right-2"
                   )}
                 >
@@ -210,15 +210,15 @@ export function MessageItem({
                 <Textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
-                  className="min-h-[60px] resize-none border-0 bg-transparent p-0 text-inherit placeholder:text-muted-foreground/60 focus-visible:ring-0"
+                  className="min-h-[60px] resize-none border-0 bg-transparent p-0 text-inherit placeholder:text-muted-foreground/60 focus-visible:ring-0 text-sm sm:text-base"
                   placeholder="Edit your message..."
                 />
                 <div className="flex space-x-2">
-                  <Button size="sm" onClick={handleSaveEdit}>
-                    <Check className="h-4 w-4 mr-1" />
+                  <Button size="sm" onClick={handleSaveEdit} className="text-xs sm:text-sm">
+                    <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                     Save
                   </Button>
-                  <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                  <Button size="sm" variant="outline" onClick={handleCancelEdit} className="text-xs sm:text-sm">
                     Cancel
                   </Button>
                 </div>
@@ -239,11 +239,12 @@ export function MessageItem({
             <Button
               variant="ghost"
               size="sm"
-              className="mt-2 h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+              className="mt-1 sm:mt-2 h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
               onClick={() => onReply && onReply(message)}
             >
               <MessageSquare className="h-3 w-3 mr-1" />
-              {message.replyCount} {message.replyCount === 1 ? 'reply' : 'replies'}
+              <span className="hidden sm:inline">{message.replyCount} {message.replyCount === 1 ? 'reply' : 'replies'}</span>
+              <span className="sm:hidden">{message.replyCount}</span>
             </Button>
           )}
 
@@ -298,19 +299,19 @@ export function MessageItem({
 
           {/* Attachments */}
           {message.attachments && message.attachments.length > 0 && (
-            <div className="mt-3 space-y-2">
+            <div className="mt-2 sm:mt-3 space-y-2">
               {message.attachments.map((attachment) => (
                 <div key={attachment.id} className={cn(
-                  "flex items-center space-x-2 p-3 rounded-lg border",
+                  "flex items-center space-x-2 p-2 sm:p-3 rounded-lg border",
                   isAuthor ? "bg-primary/10" : "bg-muted"
                 )}>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{attachment.fileName}</p>
+                    <p className="text-xs sm:text-sm font-medium truncate">{attachment.fileName}</p>
                     <p className="text-xs text-muted-foreground">
                       {(attachment.fileSize / 1024 / 1024).toFixed(2)} MB
                     </p>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" className="text-xs sm:text-sm px-2 sm:px-3">
                     Download
                   </Button>
                 </div>

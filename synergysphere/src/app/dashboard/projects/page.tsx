@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
 
 type ProjectStatus = "ACTIVE" | "COMPLETED" | "ARCHIVED";
 
@@ -109,16 +110,18 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <Breadcrumb items={[{ label: "Projects", isActive: true }]} />
+      
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Projects</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
             Manage your team projects and collaborations
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Plus className="mr-2 h-4 w-4" />
+        <Button onClick={() => setShowCreateDialog(true)} className="text-sm sm:text-base px-3 sm:px-4">
+          <Plus className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
           New Project
         </Button>
       </div>

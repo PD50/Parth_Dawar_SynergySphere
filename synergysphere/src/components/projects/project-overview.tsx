@@ -83,72 +83,85 @@ export function ProjectOverview({
   return (
     <div className="space-y-6">
       {/* Project Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-col sm:flex-row items-start justify-between gap-4 sm:gap-0">
+        <div className="flex items-center space-x-3 sm:space-x-4 w-full">
           <div
-            className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-xl"
+            className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg sm:text-xl flex-shrink-0"
             style={{ backgroundColor: project.color || "#3b82f6" }}
           >
             {project?.name?.charAt(0)?.toUpperCase() || 'P'}
           </div>
-          <div>
-            <h1 className="text-3xl font-bold">{project.name}</h1>
-            <p className="text-muted-foreground mt-1">{project.description}</p>
-            <div className="flex items-center space-x-2 mt-2">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl sm:text-3xl font-bold truncate">{project.name}</h1>
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base line-clamp-2">{project.description}</p>
+            <div className="flex items-center space-x-2 mt-2 flex-wrap gap-1">
               <Badge 
                 variant="secondary" 
-                className={statusConfig[project.status].className}
+                className={`${statusConfig[project.status].className} text-xs`}
               >
                 {statusConfig[project.status].label}
               </Badge>
               {daysUntilDeadline !== null && (
                 <Badge 
                   variant={daysUntilDeadline < 7 ? "destructive" : "secondary"}
+                  className="text-xs"
                 >
                   <Clock className="mr-1 h-3 w-3" />
-                  {daysUntilDeadline > 0 
-                    ? `${daysUntilDeadline} days left`
-                    : `${Math.abs(daysUntilDeadline)} days overdue`
-                  }
+                  <span className="hidden sm:inline">
+                    {daysUntilDeadline > 0 
+                      ? `${daysUntilDeadline} days left`
+                      : `${Math.abs(daysUntilDeadline)} days overdue`
+                    }
+                  </span>
+                  <span className="sm:hidden">
+                    {daysUntilDeadline > 0 
+                      ? `${daysUntilDeadline}d`
+                      : `-${Math.abs(daysUntilDeadline)}d`
+                    }
+                  </span>
                 </Badge>
               )}
             </div>
           </div>
         </div>
         
-        <div className="flex space-x-2">
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
           <Link href={`/dashboard/projects/${project.id}/tasks`}>
-            <Button variant="outline">
-              <CheckSquare className="mr-2 h-4 w-4" />
-              View Tasks
+            <Button variant="outline" className="w-full sm:w-auto text-xs sm:text-sm px-2 sm:px-4">
+              <CheckSquare className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">View Tasks</span>
+              <span className="sm:hidden">Tasks</span>
             </Button>
           </Link>
           <Link href={`/dashboard/projects/${project.id}/messages`}>
-            <Button variant="outline">
-              <MessageSquare className="mr-2 h-4 w-4" />
-              Messages
+            <Button variant="outline" className="w-full sm:w-auto text-xs sm:text-sm px-2 sm:px-4">
+              <MessageSquare className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Messages</span>
+              <span className="sm:hidden">Chat</span>
             </Button>
           </Link>
-          <Button variant="outline">
-            <Settings className="mr-2 h-4 w-4" />
-            Settings
+          <Button variant="outline" className="w-full sm:w-auto text-xs sm:text-sm px-2 sm:px-4">
+            <Settings className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Settings</span>
+            <span className="sm:hidden">Config</span>
           </Button>
-          <Button onClick={onEdit}>
-            <Edit className="mr-2 h-4 w-4" />
-            Edit Project
+          <Button onClick={onEdit} className="w-full sm:w-auto text-xs sm:text-sm px-2 sm:px-4">
+            <Edit className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Edit Project</span>
+            <span className="sm:hidden">Edit</span>
           </Button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Progress</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">Progress</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{completionRate}%</div>
+            <div className="text-xl sm:text-2xl font-bold">{completionRate}%</div>
             <Progress value={completionRate} className="mt-2" />
             <p className="text-xs text-muted-foreground mt-2">
               {project.completedTasks} of {project.totalTasks} tasks completed
@@ -158,11 +171,11 @@ export function ProjectOverview({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Team Members</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">Team Members</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{project.totalMembers}</div>
+            <div className="text-xl sm:text-2xl font-bold">{project.totalMembers}</div>
             <div className="flex -space-x-2 mt-2">
               {members.slice(0, 4).map((member) => (
                 <Avatar key={member.id} className="h-6 w-6 border-2 border-background">
@@ -183,11 +196,11 @@ export function ProjectOverview({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Tasks</CardTitle>
             <CheckSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{project.totalTasks}</div>
+            <div className="text-xl sm:text-2xl font-bold">{project.totalTasks}</div>
             <p className="text-xs text-muted-foreground">
               {project.totalTasks - project.completedTasks} remaining
             </p>
@@ -196,11 +209,11 @@ export function ProjectOverview({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Deadline</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">Deadline</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               {project.deadline 
                 ? new Date(project.deadline).toLocaleDateString()
                 : "Not set"
@@ -221,7 +234,7 @@ export function ProjectOverview({
       </div>
 
       {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Team Members */}
         <Card>
           <CardHeader>

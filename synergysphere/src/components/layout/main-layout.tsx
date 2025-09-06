@@ -18,7 +18,7 @@ export function MainLayout({ children, className }: MainLayoutProps) {
           <Sidebar />
         </aside>
         <main className={cn("flex-1", className)}>
-          <div className="container mx-auto p-6">
+          <div className="container mx-auto p-3 sm:p-6">
             {children}
           </div>
         </main>

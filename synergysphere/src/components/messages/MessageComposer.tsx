@@ -211,50 +211,50 @@ export function MessageComposer({
       <form onSubmit={handleSubmit} className="relative">
         {/* Formatting toolbar */}
         {!compact && isFocused && (
-          <div className="flex items-center justify-between px-3 py-2 border-b">
+          <div className="flex items-center justify-between px-2 sm:px-3 py-2 border-b">
             <div className="flex items-center space-x-1">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0"
+                className="h-6 w-6 sm:h-8 sm:w-8 p-0"
                 onClick={() => insertText("**", "**")}
                 title="Bold"
               >
-                <Bold className="h-4 w-4" />
+                <Bold className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0"
+                className="h-6 w-6 sm:h-8 sm:w-8 p-0"
                 onClick={() => insertText("*", "*")}
                 title="Italic"
               >
-                <Italic className="h-4 w-4" />
+                <Italic className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0"
+                className="h-6 w-6 sm:h-8 sm:w-8 p-0"
                 onClick={() => insertText("`", "`")}
                 title="Code"
               >
-                <Code className="h-4 w-4" />
+                <Code className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0"
+                className="h-6 w-6 sm:h-8 sm:w-8 p-0"
                 onClick={() => insertText("@")}
                 title="Mention someone"
               >
-                <AtSign className="h-4 w-4" />
+                <AtSign className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-muted-foreground hidden sm:block">
               {characterCount}/{maxLength}
             </div>
           </div>
@@ -292,34 +292,34 @@ export function MessageComposer({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-3 py-2">
-          <div className="flex items-center space-x-2">
+        <div className="flex items-center justify-between px-2 sm:px-3 py-2">
+          <div className="flex items-center space-x-1 sm:space-x-2">
             {showAttachments && (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0"
+                className="h-6 w-6 sm:h-8 sm:w-8 p-0"
                 disabled={disabled}
                 title="Attach file"
               >
-                <Paperclip className="h-4 w-4" />
+                <Paperclip className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             )}
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="h-8 w-8 p-0"
+              className="h-6 w-6 sm:h-8 sm:w-8 p-0"
               disabled={disabled}
               title="Add emoji"
             >
-              <Smile className="h-4 w-4" />
+              <Smile className="h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
           </div>
 
           <div className="flex items-center space-x-2">
-            {compact && (
+            {(compact || window.innerWidth < 640) && (
               <span className={cn(
                 "text-xs text-muted-foreground",
                 isOverLimit && "text-destructive"
@@ -331,14 +331,14 @@ export function MessageComposer({
               type="submit"
               size="sm"
               disabled={!canSend}
-              className="h-8"
+              className="h-7 sm:h-8 px-3 sm:px-4"
             >
               {isSubmitting ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                <div className="h-3 w-3 sm:h-4 sm:w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
               ) : (
                 <>
-                  <Send className="h-4 w-4 mr-1" />
-                  Send
+                  <Send className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                  <span className="text-xs sm:text-sm">Send</span>
                 </>
               )}
             </Button>

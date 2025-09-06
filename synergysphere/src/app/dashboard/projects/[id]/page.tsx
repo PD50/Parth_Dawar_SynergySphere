@@ -5,10 +5,12 @@ import { useParams } from "next/navigation";
 import { ProjectOverview } from "@/components/projects/project-overview";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Breadcrumb, useBreadcrumbs } from "@/components/ui/breadcrumb";
 
 export default function ProjectDetailPage() {
   const params = useParams();
   const projectId = params.id as string;
+  const { generateProjectBreadcrumbs } = useBreadcrumbs();
   
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,16 +66,26 @@ export default function ProjectDetailPage() {
   // Extract current user's role from the project data
   const currentUserRole = data.project.userRole || 'MEMBER';
 
+  // Generate breadcrumbs
+  const breadcrumbItems = generateProjectBreadcrumbs(
+    data.project.id,
+    data.project.name
+  );
+
   return (
-    <ProjectOverview
-      project={data.project}
-      members={data.members}
-      recentActivity={data.recentActivity}
-      currentUserRole={currentUserRole}
-      onEdit={() => {
-        // Handle edit functionality
-        console.log("Edit project:", data.project.id);
-      }}
-    />
+    <div className="space-y-4 sm:space-y-6">
+      <Breadcrumb items={breadcrumbItems} className="mb-4 sm:mb-6" />
+      
+      <ProjectOverview
+        project={data.project}
+        members={data.members}
+        recentActivity={data.recentActivity}
+        currentUserRole={currentUserRole}
+        onEdit={() => {
+          // Handle edit functionality
+          console.log("Edit project:", data.project.id);
+        }}
+      />
+    </div>
   );
 }
