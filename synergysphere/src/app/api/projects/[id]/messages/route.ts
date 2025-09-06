@@ -18,7 +18,6 @@ async function getProjectMessages(
   if (filters.search) {
     where.content = {
       contains: filters.search,
-      mode: 'insensitive',
     };
   }
 
@@ -129,32 +128,47 @@ async function createMessage(projectId: string, messageData: {
   mentions?: string[];
   attachments?: any[];
 }, authorId: string) {
-  // Extract mentions from content (simple implementation)
-  const mentionRegex = /@(\w+)/g;
+  // Extract mentions from content - handle names with spaces
+  console.log('Processing mentions in content:', messageData.content);
+  console.log('Content length:', messageData.content.length);
+  
+  // Match @mention until we hit space+lowercase word (indicating end of name)
+  const mentionRegex = /@([\w\s]+?)(?=\s[a-z]|$)/g;
+  console.log('Using regex:', mentionRegex.source);
+  
   const contentMentions: string[] = [];
   let match;
   
   while ((match = mentionRegex.exec(messageData.content)) !== null) {
-    // Look up users by name
+    console.log('Raw match:', match);
+    console.log('Match[0] (full match):', match[0]);
+    console.log('Match[1] (captured group):', match[1]);
+    console.log('Match[1] length:', match[1].length);
+    
+    const mentionedName = match[1].trim();
+    console.log('Trimmed mention name:', mentionedName);
+    console.log('Trimmed name length:', mentionedName.length);
+    
+    // Look up users by exact name match
     const mentionedUsers = await prisma.user.findMany({
       where: {
-        name: {
-          contains: match[1],
-          mode: 'insensitive',
-        },
+        name: mentionedName,
       },
-      select: { id: true },
+      select: { id: true, name: true },
     });
+    console.log('Matched users for', mentionedName, ':', mentionedUsers);
     
     mentionedUsers.forEach(user => {
       if (!contentMentions.includes(user.id)) {
         contentMentions.push(user.id);
+        console.log('Added user ID to contentMentions:', user.id);
       }
     });
   }
 
   const mentions = [...(messageData.mentions || []), ...contentMentions];
   const uniqueMentions = [...new Set(mentions)];
+  console.log('Final mentions array:', uniqueMentions);
 
   // Set threadId - if this is a reply, use the parentId's threadId or the parentId itself
   let finalThreadId = messageData.threadId;
@@ -204,9 +218,16 @@ async function createMessage(projectId: string, messageData: {
   });
 
   // Create notifications for mentioned users
+  console.log('Creating notifications for mentions. Unique mentions:', uniqueMentions);
+  console.log('Author ID:', authorId);
+  
   if (uniqueMentions.length > 0) {
     const mentionNotifications = uniqueMentions
-      .filter(userId => userId !== authorId) // Don't notify yourself
+      .filter(userId => {
+        const shouldNotify = userId !== authorId;
+        console.log(`User ${userId} - should notify:`, shouldNotify);
+        return shouldNotify;
+      })
       .map(userId => ({
         userId,
         fromUserId: authorId,
@@ -222,11 +243,18 @@ async function createMessage(projectId: string, messageData: {
         },
       }));
 
+    console.log('Mention notifications to create:', mentionNotifications);
+    
     if (mentionNotifications.length > 0) {
-      await prisma.notification.createMany({
+      const result = await prisma.notification.createMany({
         data: mentionNotifications,
       });
+      console.log('Created notifications result:', result);
+    } else {
+      console.log('No notifications to create');
     }
+  } else {
+    console.log('No unique mentions found');
   }
 
   // Create reply notification if this is a reply
@@ -285,7 +313,7 @@ async function createMessage(projectId: string, messageData: {
   };
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const authResult = await verifyAuth(req);
     if (!authResult.success) {
@@ -295,7 +323,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       );
     }
 
-    const projectId = params.id;
+    const { id: projectId } = await params;
     const searchParams = req.nextUrl.searchParams;
     
     // Parse query parameters
@@ -337,7 +365,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const authResult = await verifyAuth(req);
     if (!authResult.success) {
@@ -347,7 +375,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       );
     }
 
-    const projectId = params.id;
+    const { id: projectId } = await params;
     const body = await req.json();
 
     // Validate request body

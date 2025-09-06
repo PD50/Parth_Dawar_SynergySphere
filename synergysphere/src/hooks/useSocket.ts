@@ -19,8 +19,8 @@ export function useSocket({
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    // Initialize socket connection
-    if (typeof window !== 'undefined' && projectId) {
+    // Initialize socket connection only if WebSocket server is configured
+    if (typeof window !== 'undefined' && projectId && process.env.NEXT_PUBLIC_SOCKET_URL) {
       socketRef.current = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001', {
         transports: ['websocket'],
       });
@@ -59,7 +59,11 @@ export function useSocket({
       });
 
       socket.on('connect_error', (error) => {
-        console.error('WebSocket connection error:', error);
+        // Silently fail if WebSocket server is not available
+        // This prevents console spam during development
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('WebSocket server not available (this is normal if not running a Socket.IO server)');
+        }
       });
     }
 

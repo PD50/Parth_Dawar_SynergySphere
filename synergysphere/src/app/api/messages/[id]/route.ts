@@ -98,21 +98,23 @@ async function updateMessage(messageId: string, updates: {
   };
 
   if (updates.content !== undefined) {
-    // Extract mentions from content
-    const mentionRegex = /@(\w+)/g;
+    // Extract mentions from content - handle names with spaces
+    console.log('Processing mentions in edit content:', updates.content);
+    const mentionRegex = /@([\w\s]+?)(?=\s[a-z]|$)/g;
     const contentMentions: string[] = [];
     let match;
     
     while ((match = mentionRegex.exec(updates.content)) !== null) {
+      const mentionedName = match[1].trim();
+      console.log('Found mention in edit:', mentionedName);
+      // Look up users by exact name match
       const mentionedUsers = await prisma.user.findMany({
         where: {
-          name: {
-            contains: match[1],
-            mode: 'insensitive',
-          },
+          name: mentionedName,
         },
         select: { id: true },
       });
+      console.log('Matched users for edit', mentionedName, ':', mentionedUsers);
       
       mentionedUsers.forEach(user => {
         if (!contentMentions.includes(user.id)) {

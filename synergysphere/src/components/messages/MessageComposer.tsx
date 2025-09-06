@@ -108,9 +108,9 @@ export function MessageComposer({
     setContent(newContent);
     setCursorPosition(cursorPos);
     
-    // Check for @mentions
+    // Check for @mentions - handle names with spaces
     const beforeCursor = newContent.slice(0, cursorPos);
-    const mentionMatch = beforeCursor.match(/@(\w*)$/);
+    const mentionMatch = beforeCursor.match(/@([\w\s]*)$/);
     
     if (mentionMatch) {
       setMentionQuery(mentionMatch[1]);
@@ -124,7 +124,7 @@ export function MessageComposer({
   const handleMentionSelect = (user: { id: string; name: string; email: string }) => {
     const beforeCursor = content.slice(0, cursorPosition);
     const afterCursor = content.slice(cursorPosition);
-    const mentionMatch = beforeCursor.match(/@(\w*)$/);
+    const mentionMatch = beforeCursor.match(/@([\w\s]*)$/);
     
     if (mentionMatch) {
       const beforeMention = beforeCursor.slice(0, mentionMatch.index);

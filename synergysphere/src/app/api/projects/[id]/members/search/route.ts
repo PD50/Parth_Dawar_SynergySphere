@@ -40,8 +40,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     if (query.trim()) {
       whereCondition.user = {
         OR: [
-          { name: { contains: query, mode: 'insensitive' } },
-          { email: { contains: query, mode: 'insensitive' } },
+          { name: { contains: query } },
+          { email: { contains: query } },
         ],
       };
     }

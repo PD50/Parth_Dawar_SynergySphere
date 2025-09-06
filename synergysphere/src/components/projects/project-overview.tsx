@@ -89,7 +89,7 @@ export function ProjectOverview({
             className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-xl"
             style={{ backgroundColor: project.color || "#3b82f6" }}
           >
-            {project.name.charAt(0).toUpperCase()}
+            {project?.name?.charAt(0)?.toUpperCase() || 'P'}
           </div>
           <div>
             <h1 className="text-3xl font-bold">{project.name}</h1>
