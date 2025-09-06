@@ -1,0 +1,1 @@
+// Domain types will be defined in Sprint 2

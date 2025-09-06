@@ -1,0 +1,1 @@
+// API response types will be defined in Sprint 2
