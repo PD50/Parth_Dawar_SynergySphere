@@ -14,15 +14,26 @@ import NotFound from './pages/NotFound';
 import LoadingSpinner from './components/LoadingSpinner';
 
 function App() {
-  const { user, loading } = useAuth();
+  const { user, loading, token, fetchUser } = useAuth();
   const [isInitializing, setIsInitializing] = useState(true);
 
+  // Initialize auth state when app loads
   useEffect(() => {
-    // Wait for auth to initialize
-    if (!loading) {
+    const initAuth = async () => {
+      if (token && !user) {
+        try {
+          await fetchUser();
+        } catch (error) {
+          console.error('Failed to fetch user:', error);
+        }
+      }
       setIsInitializing(false);
+    };
+
+    if (!loading) {
+      initAuth();
     }
-  }, [loading]);
+  }, [loading, token, user, fetchUser]);
 
   if (isInitializing) {
     return (

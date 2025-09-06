@@ -17,15 +17,34 @@ export const useSocket = (options: SocketHookOptions = {}) => {
     // Get the API URL from environment variables
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     const path = namespace ? `${baseUrl}/${namespace}` : baseUrl;
-    
+
+    console.log('[SOCKET] Initializing socket connection');
+    console.log('[SOCKET] Base URL:', baseUrl);
+    console.log('[SOCKET] Namespace:', namespace);
+    console.log('[SOCKET] Path:', path);
+    console.log('[SOCKET] AutoConnect:', autoConnect);
+
     // Create socket instance
     const socket = io(path, {
       autoConnect,
       withCredentials: true,
     });
-    
+
     socketRef.current = socket;
-    
+
+    // Add connection event listeners for debugging
+    socket.on('connect', () => {
+      console.log('[SOCKET] Connected to server');
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('[SOCKET] Disconnected from server, reason:', reason);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('[SOCKET] Connection error:', error);
+    });
+
     return socket;
   }, [namespace, autoConnect]);
   

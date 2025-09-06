@@ -63,7 +63,7 @@ const messageNamespace = io.of('/message');
 
 // Socket.IO connection handling
 projectNamespace.on('connection', (socket) => {
-  console.log('Client connected to project namespace');
+  console.log('[BACKEND] Client connected to project namespace, socket ID:', socket.id);
   
   // Join a project room
   socket.on('join-project', (projectId) => {
@@ -88,7 +88,7 @@ projectNamespace.on('connection', (socket) => {
 });
 
 messageNamespace.on('connection', (socket) => {
-  console.log('Client connected to message namespace');
+  console.log('[BACKEND] Client connected to message namespace, socket ID:', socket.id);
   
   // Join a chat room
   socket.on('join-chat', (projectId) => {

@@ -1,8 +1,13 @@
 import axios from 'axios';
-import { useAuth } from '../hooks/useAuth';
+import { useAuthStore } from '../hooks/useAuth';
 
-// Set base URL from environment variable
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Set base URL - check if we're in development or production
+// In a real setup, you'd get this from environment variables
+const API_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://api.motion-gpt.com' 
+  : 'http://localhost:5000';
+
+console.log('[API] Using API URL:', API_URL);
 
 // Create axios instance
 const api = axios.create({
@@ -14,9 +19,9 @@ const api = axios.create({
 
 // Auth API
 export const authApi = {
-  // Handle Google OAuth callback
+  // Handle Google OAuth callback - Now uses the store directly
   handleCallback: async (token: string) => {
-    const { login } = useAuth();
+    const login = useAuthStore.getState().login;
     await login(token);
   },
   
@@ -143,29 +148,43 @@ export const messageApi = {
   },
 };
 
-// Request interceptor for adding token
+// Request interceptor for adding token - Now uses the store directly
 api.interceptors.request.use(
   (config) => {
-    const { token } = useAuth();
+    const token = useAuthStore.getState().token;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('[API] Adding auth token to request');
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for handling errors
+// Response interceptor for handling errors - Now uses the store directly
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     // Handle unauthorized errors (401)
     if (error.response && error.response.status === 401) {
-      const { logout } = useAuth();
+      console.log('[API] 401 Unauthorized response, logging out');
+      const logout = useAuthStore.getState().logout;
       logout();
     }
     return Promise.reject(error);
   }
 );
+
+// Initialize axios with token from auth store if available
+const initializeApi = () => {
+  const token = useAuthStore.getState().token;
+  if (token) {
+    console.log('[API] Initializing API with token from auth store');
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  }
+};
+
+// Run initialization
+initializeApi();
 
 export default api;

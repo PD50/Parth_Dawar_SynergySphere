@@ -20,7 +20,11 @@ const Login: React.FC = () => {
       // In a real implementation, you'd send this to your backend and get a JWT back
       // For simplicity in this example, we're just using the Google token directly
       await login(tokenResponse.access_token);
-      navigate('/dashboard');
+      
+      // Add small delay to ensure state is updated
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 300);
     } catch (err) {
       setError('Failed to authenticate with server');
       console.error('Login error:', err);
@@ -40,6 +44,28 @@ const Login: React.FC = () => {
     onSuccess: handleLoginSuccess,
     onError: handleLoginError,
   });
+
+  // Handle skip login for testing
+  const handleSkipLogin = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Use a mock token for testing
+      const mockToken = 'mock-jwt-token-for-testing';
+      await login(mockToken);
+
+      // Add small delay to ensure state is updated
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 300);
+    } catch (err) {
+      setError('Failed to skip login');
+      console.error('Skip login error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   // Check for token in URL when coming from OAuth callback
   useEffect(() => {
@@ -51,7 +77,11 @@ const Login: React.FC = () => {
         setIsLoading(true);
         try {
           await login(token);
-          navigate('/dashboard');
+          
+          // Add small delay to ensure state is updated
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 300);
         } catch (err) {
           setError('Failed to authenticate with token');
           console.error('Token login error:', err);
@@ -115,6 +145,16 @@ const Login: React.FC = () => {
               </button>
             </div>
             
+            <div>
+              <button
+                onClick={handleSkipLogin}
+                disabled={isLoading}
+                className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              >
+                {isLoading ? 'Signing in...' : 'Skip Login (Testing)'}
+              </button>
+            </div>
+
             <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
